@@ -185,6 +185,67 @@ for v = {'neutral', 'tilt', 'turn', 'lean', 'closer'}
 end
 nFail = nFail + check(ok, 'pipeline: all pose variants x both warp modes succeed');
 
+%% ===== Phase 2b: segmentation, body fit, sleeves, shading ====================
+[frame, kp, garmentImg, garmentAlpha, background] = makeSyntheticTestData();
+
+% 19. Background subtraction finds the person's torso but not the wall.
+%     (The synthetic skin is almost wall-coloured, so the head is not
+%     required - only the torso is used by the body fit.)
+bodyMask = segmentPersonBackground(frame, background, cfg.segment);
+nFail = nFail + check(bodyMask(300, 320) && bodyMask(200, 260) && ~bodyMask(20, 20) && ~bodyMask(300, 600), ...
+    'segment: torso is foreground, wall is background');
+
+% 20. Body fit: at waist height the garment edges end up at the body edges
+%     (+ ease), with strength 1.
+c = cfg;  c.fit.strength = 1;  c.sleeves.enable = false;
+c.shading.enable = false;  c.lighting.enable = false;
+[~, dbg] = tryOnPipeline(frame, kp, garmentImg, garmentAlpha, c, bodyMask);
+y = 330;
+row = dbg.layerAlpha(y, :) > 0.5;
+bodyRow = bodyMask(y, :);
+gEdges = [find(row, 1, 'first'), find(row, 1, 'last')];
+bEdges = [find(bodyRow(200:440), 1, 'first') + 199, find(bodyRow(200:440), 1, 'last') + 199];
+err = abs(gEdges - (bEdges + [-c.fit.ease c.fit.ease]));
+nFail = nFail + check(dbg.fitInfo.ok && all(err <= 3), ...
+    sprintf('fit: garment edges follow the body at the waist (error %d / %d px)', err(1), err(2)));
+
+% 21. Sleeves: with the arms raised sideways, the garment covers a point
+%     along the upper arm; with sleeves disabled it does not.
+kpUp = kp;
+kpUp.leftElbow  = [kp.leftShoulder(1) + 80,  kp.leftShoulder(2)  + 5, 0.9];
+kpUp.rightElbow = [kp.rightShoulder(1) - 80, kp.rightShoulder(2) + 5, 0.9];
+c = cfg;  c.fit.enable = false;
+[~, dOn] = tryOnPipeline(frame, kpUp, garmentImg, garmentAlpha, c);
+c.sleeves.enable = false;
+[~, dOff] = tryOnPipeline(frame, kpUp, garmentImg, garmentAlpha, c);
+probeL = round(kp.leftShoulder(1:2)  + [45 3]);
+probeR = round(kp.rightShoulder(1:2) + [-45 3]);
+nFail = nFail + check(all(dOn.sleeves) && ...
+    dOn.layerAlpha(probeL(2), probeL(1)) > 0.5 && dOn.layerAlpha(probeR(2), probeR(1)) > 0.5 && ...
+    dOff.layerAlpha(probeL(2), probeL(1)) < 0.5, ...
+    'sleeves: sleeves follow raised arms');
+
+% 22. Shading: a flat frame leaves the garment unchanged; a dark crease in
+%     the frame darkens the garment there.
+gRGB = repmat(reshape([0.8 0.2 0.2], 1, 1, 3), 100, 100);
+gA = ones(100, 100);
+flat = 0.6 * ones(100, 100, 3);
+[sFlat, shadeFlat] = transferBodyShading(gRGB, gA, flat, cfg.shading);
+crease = flat;  crease(:, 48:52, :) = 0.3;
+[sCrease, shadeCrease] = transferBodyShading(gRGB, gA, crease, cfg.shading);
+nFail = nFail + check(max(abs(sFlat(:) - gRGB(:))) < 1e-6 && ...
+                      shadeCrease(50, 50) < 0.8 && abs(shadeCrease(50, 10) - 1) < 0.1 && ...
+                      sCrease(50, 50, 1) < gRGB(50, 50, 1), ...
+    'shading: flat frame = no change, crease in frame = darker garment');
+
+% 23. Elbows are parsed from arrays and are optional.
+coco = zeros(17, 3);
+coco([6 7 12 13 8 9], :) = [395 165 .9; 245 165 .9; 368 365 .9; 272 365 .9; 433 255 .9; 207 255 .1];
+t = getTorsoKeypoints(coco, frameSize, 0.3);
+nFail = nFail + check(t.valid && t.hasLeftElbow && ~t.hasRightElbow && ...
+                      norm(t.leftElbow - [433 255]) < 1e-9, ...
+    'keypoints: elbows parsed, low-confidence elbow ignored, torso still valid');
+
 %% ===== Summary ===============================================================
 if nFail == 0
     fprintf('\nAll checks passed.\n');

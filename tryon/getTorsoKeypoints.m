@@ -24,7 +24,9 @@ function torso = getTorsoKeypoints(poseKeypoints, frameSize, minScore)
 %   OUTPUT
 %     torso  struct with fields leftShoulder, rightShoulder, leftHip,
 %            rightHip (1x2 [x y] pixels), valid (logical) and reason (char,
-%            why it is invalid).
+%            why it is invalid). Also leftElbow / rightElbow with flags
+%            hasLeftElbow / hasRightElbow: elbows are OPTIONAL (only used to
+%            rotate the sleeves); a missing elbow never makes torso invalid.
 %
 %   ASSUMPTIONS
 %   - If every x and y is <= 1.5, the coordinates are taken to be normalised
@@ -39,16 +41,23 @@ if nargin < 3 || isempty(minScore)
     minScore = 0.3;
 end
 
-names = {'leftShoulder', 'rightShoulder', 'leftHip', 'rightHip'};
+% The first 4 are required, the elbows (5-6) are optional.
+names = {'leftShoulder', 'rightShoulder', 'leftHip', 'rightHip', 'leftElbow', 'rightElbow'};
+nRequired = 4;
 torso = struct('leftShoulder', [NaN NaN], 'rightShoulder', [NaN NaN], ...
                'leftHip', [NaN NaN], 'rightHip', [NaN NaN], ...
+               'leftElbow', [NaN NaN], 'rightElbow', [NaN NaN], ...
+               'hasLeftElbow', false, 'hasRightElbow', false, ...
                'valid', false, 'reason', '');
 
-% ---- 1. Collect the 4 raw rows [x y score] ---------------------------------
-raw = NaN(4, 3);                    % one row per name, score NaN = "no score"
+% ---- 1. Collect the raw rows [x y score] -----------------------------------
+raw = NaN(numel(names), 3);         % one row per name, score NaN = "no score"
 if isstruct(poseKeypoints)
     for i = 1:numel(names)
         if ~isfield(poseKeypoints, names{i}) || isempty(poseKeypoints.(names{i}))
+            if i > nRequired
+                continue            % optional elbow not given -> stays NaN
+            end
             torso.reason = sprintf('missing field "%s"', names{i});
             return
         end
@@ -58,12 +67,13 @@ if isstruct(poseKeypoints)
 
 elseif isnumeric(poseKeypoints)
     kp = double(poseKeypoints);
-    % Row indices (1-based) of [leftShoulder rightShoulder leftHip rightHip]
+    % Row indices (1-based) of
+    % [leftShoulder rightShoulder leftHip rightHip leftElbow rightElbow]
     switch size(kp, 1)
-        case 17, idx = [6 7 12 13];     % COCO-17
-        case 18, idx = [6 3 12 9];      % OpenPose COCO-18
-        case 25, idx = [6 3 13 10];     % OpenPose BODY_25
-        case 33, idx = [12 13 24 25];   % MediaPipe BlazePose
+        case 17, idx = [6 7 12 13 8 9];      % COCO-17
+        case 18, idx = [6 3 12 9 7 4];       % OpenPose COCO-18
+        case 25, idx = [6 3 13 10 7 4];      % OpenPose BODY_25
+        case 33, idx = [12 13 24 25 14 15];  % MediaPipe BlazePose
         otherwise
             torso.reason = sprintf('unknown keypoint layout with %d rows', size(kp, 1));
             return
@@ -79,17 +89,20 @@ end
 % ---- 2. Validity: finite coordinates and a high enough score ---------------
 xy    = raw(:, 1:2);
 score = raw(:, 3);
-if any(~isfinite(xy(:)))
+% NaN scores compare false -> "no score given" counts as confident.
+ok = all(isfinite(xy), 2) & ~(score < minScore);
+if any(~all(isfinite(xy(1:nRequired, :)), 2))
     torso.reason = 'a torso keypoint is NaN/Inf (not detected)';
     return
 end
-if any(score < minScore)            % NaN scores compare false -> ignored
+if ~all(ok(1:nRequired))
     torso.reason = 'a torso keypoint is below the confidence threshold';
     return
 end
 
 % ---- 3. Normalised -> pixel coordinates ------------------------------------
-if all(xy(:) <= 1.5)
+req = xy(1:nRequired, :);
+if all(req(:) <= 1.5)
     xy(:, 1) = xy(:, 1) * frameSize(2);     % x scales with width
     xy(:, 2) = xy(:, 2) * frameSize(1);     % y scales with height
 end
@@ -97,5 +110,7 @@ end
 for i = 1:numel(names)
     torso.(names{i}) = xy(i, :);
 end
+torso.hasLeftElbow  = ok(5);
+torso.hasRightElbow = ok(6);
 torso.valid = true;
 end
