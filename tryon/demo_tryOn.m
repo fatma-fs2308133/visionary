@@ -11,6 +11,8 @@
 %     Figure 5 - LIGHTING: dim scene without / with lighting matching, and
 %                the V-channel histograms
 %     Figure 6 - final result + timing (frames per second estimate)
+%     Figure 7 - shape & "flow": body-shape fit, sleeves following the arms
+%                and shading transfer, switched on one after the other
 %
 %   To try your own images, set useOwnImages = true below.
 %   Set saveFigures = true to write every figure as a PNG (for the report).
@@ -227,3 +229,46 @@ if saveFigures, print(f6, fullfile(outDir, 'fig6_final.png'), '-dpng', '-r100');
 
 fprintf('Pipeline: %.1f ms per frame (%.0f fps) at %dx%d, excluding pose estimation.\n', ...
         msPerFrame, 1000 / msPerFrame, size(frame, 2), size(frame, 1));
+
+%% ---- Figure 7: body-shape fit, sleeves, shading ------------------------------
+% Needs a picture of the empty scene for background subtraction. The
+% synthetic data provides one; for your own photo take a second photo from
+% the same spot without the person and load it here.
+if useOwnImages
+    background = imread('background.jpg');           % <-- your file
+else
+    [~, ~, ~, ~, background] = makeSyntheticTestData();
+end
+bodyMask = segmentPersonBackground(frame, background, cfg.segment);
+
+steps = {'basic (Phase 2a)', '+ body-shape fit', '+ sleeves follow arms', '+ shading (folds)'};
+c = cfg;
+c.fit.enable = false;  c.sleeves.enable = false;  c.shading.enable = false;
+f7 = figure('Name', '7 - Shape and flow', 'Position', [50 50 1500 700]);
+for i = 1:numel(steps)
+    if i >= 2, c.fit.enable = true;     end
+    if i >= 3, c.sleeves.enable = true; end
+    if i >= 4, c.shading.enable = true; end
+    [outStep, dbgStep] = tryOnPipeline(frame, kp, garmentImg, garmentAlpha, c, bodyMask);
+    subplot(2, 4, i);
+    imshow(outStep);
+    title(steps{i});
+end
+subplot(2, 4, 5);
+imshow(bodyMask);
+title('person mask (background subtraction)');
+subplot(2, 4, 6);
+imshow(frame);  hold on;
+fi = dbgStep.fitInfo;
+if fi.ok
+    plot(fi.gL, fi.rows, 'r', fi.gR, fi.rows, 'r', 'LineWidth', 1);   % straight edges
+    plot(fi.tL, fi.rows, 'g', fi.tR, fi.rows, 'g', 'LineWidth', 1.5); % fitted edges
+end
+title('garment edges: red = before fit, green = after');
+subplot(2, 4, 7);
+imshow(dbgStep.shade, [0.5 1.4]);  colorbar;
+title('shading factor copied from the frame');
+subplot(2, 4, 8);
+imshow(dbgStep.layerAlpha);
+title('garment layer alpha (torso + rotated sleeves)');
+if saveFigures, print(f7, fullfile(outDir, 'fig7_shape_flow.png'), '-dpng', '-r100'); end

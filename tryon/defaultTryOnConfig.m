@@ -43,6 +43,15 @@ cfg.garment.anchors.rightShoulder = [0.27 0.14];   % image-left shoulder seam
 cfg.garment.anchors.leftShoulder  = [0.73 0.14];   % image-right shoulder seam
 cfg.garment.anchors.rightHip      = [0.33 0.93];   % image-left, near the hem
 cfg.garment.anchors.leftHip       = [0.67 0.93];   % image-right, near the hem
+% Sleeve anchors (used to cut the sleeves off and rotate them with the arms):
+% the armpit point and the centre of each sleeve opening. The sleeve is
+% everything on the outer side of the line shoulder -> armpit.
+cfg.garment.anchors.rightArmpit    = [0.24 0.33];
+cfg.garment.anchors.leftArmpit     = [0.76 0.33];
+cfg.garment.anchors.rightSleeveEnd = [0.08 0.38];
+cfg.garment.anchors.leftSleeveEnd  = [0.92 0.38];
+% >>> Easiest way to set all 8 anchors for YOUR garment:
+% >>>     pickGarmentAnchors('shirt.png')   (click them; saved next to the PNG)
 
 %% ------------------------------------------------------------------------
 %  Warping
@@ -55,6 +64,69 @@ cfg.garment.anchors.leftHip       = [0.67 0.93];   % image-right, near the hem
 %               affine transform for the whole garment. Simpler, but a
 %               single affine cannot squash one side more than the other.
 cfg.warp.mode = 'piecewise';
+
+%% ------------------------------------------------------------------------
+%  Sleeves follow the arms (needs elbow keypoints)
+%  ------------------------------------------------------------------------
+% Each sleeve is cut off the garment and rotated about the shoulder so its
+% axis points along the upper arm (shoulder -> elbow). Without this the
+% sleeves keep the angle they have in the garment photo (sticking out) no
+% matter where the arms are. If an elbow is not detected, that sleeve just
+% moves with the torso.
+cfg.sleeves.enable = true;
+
+%% ------------------------------------------------------------------------
+%  Fit the garment to the body silhouette (needs a background frame)
+%  ------------------------------------------------------------------------
+% The 4-point warp only knows where shoulders and hips are, so the garment
+% sides stay straight. With a person mask (background subtraction) each
+% garment row below the armpits is stretched/squeezed horizontally so its
+% left/right edges follow the body's edges (waist, chest, hips).
+cfg.fit.enable = true;
+% 0 = ignore the body shape, 1 = hug it completely. ASSUMPTION 0.8: a
+% T-shirt is a bit looser than the body.
+cfg.fit.strength = 0.8;
+% Extra width (px) on each side so the garment sits slightly outside the
+% skin, like real fabric. ASSUMPTION: 4 px at 640x480.
+cfg.fit.ease = 4;
+% Fitting starts this far down from the shoulders (fraction of shoulder->hip
+% distance, ~armpit level) and fades in over fadeFrac, so the shoulders and
+% sleeves are not distorted.
+cfg.fit.startFrac = 0.25;
+cfg.fit.fadeFrac  = 0.20;
+% Smoothing of the edge offsets along the vertical direction (rows), so a
+% noisy mask does not make the garment edge wobble.
+cfg.fit.smoothSigma = 6;
+% Rows where body width / garment width is outside this range are treated as
+% segmentation errors (arm touching the body, shadow) and interpolated.
+cfg.fit.minRatio = 0.6;
+cfg.fit.maxRatio = 1.5;
+
+% Background subtraction (segmentPersonBackground)
+cfg.segment.threshold  = 0.12;  % colour difference (0..1) counted as "person"
+cfg.segment.blurSigma  = 1.5;   % denoise both images before differencing
+cfg.segment.openRadius = 2;     % remove speckles
+cfg.segment.closeRadius = 6;    % close small gaps inside the body
+
+%% ------------------------------------------------------------------------
+%  Shading transfer: folds / body curvature onto the garment ("flow")
+%  ------------------------------------------------------------------------
+% The clothes the person is really wearing show how light falls on the body:
+% darker at the sides (the torso is round), wrinkles, folds, shadows under
+% the chest. We measure that shading in the webcam frame (brightness divided
+% by its local average) and multiply it onto the garment, so the virtual
+% garment gets the same folds and 3-D roundness and moves with the person.
+cfg.shading.enable = true;
+% 0 = flat garment, 1 = full shading of the real clothes. ASSUMPTION 0.8.
+cfg.shading.strength = 0.8;
+% Size (px) of the "local average": structures smaller than ~2x this count
+% as shading/folds. ASSUMPTION: 15 px at 640x480 (torso ~150-250 px wide).
+cfg.shading.baseSigma = 15;
+% Light pre-blur to remove camera noise and very fine fabric texture.
+cfg.shading.fineSigma = 1.2;
+% Clamp for the shading factor (avoid black holes / blown-out spots).
+cfg.shading.minShade = 0.5;
+cfg.shading.maxShade = 1.4;
 
 %% ------------------------------------------------------------------------
 %  Lighting matching

@@ -5,7 +5,12 @@ function liveTryOn(garmentFile, opts)
 %   liveTryOn('shirt.png')       % your own garment PNG (with transparency)
 %   liveTryOn('shirt.png', opts) % options, see below
 %
-%   Close the window or press Q to stop.
+%   KEYS (click the video window first):
+%     B  capture the empty background (3-second countdown: step OUT of view).
+%        Needed for the body-shape fit. Press again if the light changes.
+%     F  body-shape fit on/off       S  shading (folds) on/off
+%     A  sleeves follow arms on/off  L  lighting match on/off
+%     M  show the person mask        Q  quit (or close the window)
 %
 %   REQUIREMENTS
 %     - MATLAB Support Package for USB Webcams  (for webcam / snapshot)
@@ -19,6 +24,9 @@ function liveTryOn(garmentFile, opts)
 %
 %   STAND BACK: the pose model needs to see your HIPS. At a desk the webcam
 %   usually only sees your chest, the hips are missing and nothing is drawn.
+%
+%   YOUR OWN GARMENT: run pickGarmentAnchors('shirt.png') once. It saves
+%   shirt_anchors.mat next to the PNG, which liveTryOn loads automatically.
 %
 %   opts fields (all optional):
 %     .poseMode    'auto' (HRNet if available, else manual) | 'hrnet' | 'manual'
@@ -39,7 +47,20 @@ if nargin >= 1 && ~isempty(garmentFile)
     if isempty(garmentAlpha)
         error('"%s" has no alpha channel. Use a PNG with a transparent background.', garmentFile);
     end
-    fprintf('Garment: %s  (check cfg.garment.anchors match this image!)\n', garmentFile);
+    fprintf('Garment: %s\n', garmentFile);
+    [folder, name] = fileparts(garmentFile);
+    anchorsFile = fullfile(folder, [name '_anchors.mat']);
+    if exist(anchorsFile, 'file')
+        loaded = load(anchorsFile, 'anchors');
+        fn = fieldnames(loaded.anchors);
+        for i = 1:numel(fn)
+            cfg.garment.anchors.(fn{i}) = loaded.anchors.(fn{i});
+        end
+        fprintf('Anchors: loaded %s\n', anchorsFile);
+    else
+        fprintf(['Anchors: using defaults - run pickGarmentAnchors(''%s'') ' ...
+                 'for a better fit.\n'], garmentFile);
+    end
 else
     [~, ~, garmentImg, garmentAlpha] = makeSyntheticTestData();
     fprintf('Garment: synthetic test T-shirt\n');
@@ -77,18 +98,56 @@ if strcmp(poseMode, 'manual')
 end
 
 %% ---- Display window ------------------------------------------------------------
-fig = figure('Name', 'Live try-on  (press Q or close to stop)', 'NumberTitle', 'off');
-set(fig, 'KeyPressFcn', @(src, evt) setappdata(src, 'stop', strcmpi(evt.Key, 'q')));
-setappdata(fig, 'stop', false);
+fig = figure('Name', 'Live try-on  (B = background, F/S/A/L = toggles, Q = quit)', ...
+             'NumberTitle', 'off');
+set(fig, 'KeyPressFcn', @(src, evt) setappdata(src, 'key', lower(evt.Key)));
+setappdata(fig, 'key', '');
 hImg = imshow(frame);
 hTitle = title('starting...');
+fprintf('Press B (with the video window focused) to capture the background for the body fit.\n');
 
 %% ---- Main loop -----------------------------------------------------------------
 smoothKp = [];
+background = [];                 % empty-scene frame for background subtraction
+bgCountdown = [];                % tic of a running background countdown
+showMask = false;
 nFrames = 0;
-while ishandle(fig) && ~getappdata(fig, 'stop') && nFrames < opts.maxFrames
+while ishandle(fig) && nFrames < opts.maxFrames
     tLoop = tic;
     frame = grabFrame(cam, opts.mirror);
+
+    % ---- keyboard ----
+    key = getappdata(fig, 'key');
+    setappdata(fig, 'key', '');
+    switch key
+        case 'q', break
+        case 'b', bgCountdown = tic;
+        case 'f', cfg.fit.enable      = ~cfg.fit.enable;
+        case 's', cfg.shading.enable  = ~cfg.shading.enable;
+        case 'a', cfg.sleeves.enable  = ~cfg.sleeves.enable;
+        case 'l', cfg.lighting.enable = ~cfg.lighting.enable;
+        case 'm', showMask = ~showMask;
+    end
+
+    % ---- background capture: 3 s countdown so the user can step away ----
+    if ~isempty(bgCountdown)
+        remaining = 3 - toc(bgCountdown);
+        if remaining > 0
+            set(hImg, 'CData', frame);
+            set(hTitle, 'String', sprintf('STEP OUT OF VIEW - capturing background in %.0f s', ceil(remaining)));
+            drawnow;
+            continue
+        end
+        background = captureBackground(cam, opts.mirror);
+        bgCountdown = [];
+        fprintf('Background captured. Step back in.\n');
+    end
+
+    % Person mask (only if a background was captured)
+    bodyMask = [];
+    if ~isempty(background)
+        bodyMask = segmentPersonBackground(frame, background, cfg.segment);
+    end
 
     % 1. Pose keypoints (COCO-17 layout: rows = keypoints, cols = [x y score])
     if strcmp(poseMode, 'hrnet')
@@ -109,18 +168,24 @@ while ishandle(fig) && ~getappdata(fig, 'stop') && nFrames < opts.maxFrames
         out = frame;
         status = 'no person detected';
     else
-        [out, dbg] = tryOnPipeline(frame, kp, garmentImg, garmentAlpha, cfg);
+        [out, dbg] = tryOnPipeline(frame, kp, garmentImg, garmentAlpha, cfg, bodyMask);
         if dbg.ok
             status = 'tracking';
         else
             status = ['no overlay: ' dbg.reason];
         end
     end
+    if showMask && ~isempty(bodyMask)
+        % Tint the detected person green to check the segmentation.
+        out(:, :, 2) = max(out(:, :, 2), uint8(160 * bodyMask));
+    end
 
     % 4. Show (updating CData is much faster than calling imshow again)
     if ~ishandle(fig), break; end
     set(hImg, 'CData', out);
-    set(hTitle, 'String', sprintf('%s  |  %.1f fps  |  Q = quit', status, 1 / toc(tLoop)));
+    set(hTitle, 'String', sprintf('%s | %.1f fps | fit:%s%s shade:%s arms:%s light:%s', ...
+        status, 1 / toc(tLoop), onOff(cfg.fit.enable), noBgNote(background, cfg.fit.enable), ...
+        onOff(cfg.shading.enable), onOff(cfg.sleeves.enable), onOff(cfg.lighting.enable)));
     drawnow limitrate;
     nFrames = nFrames + 1;
 end
@@ -136,6 +201,25 @@ if mirror
     % and display consistent, and garment text still reads correctly.
     frame = fliplr(frame);
 end
+end
+
+function background = captureBackground(cam, mirror)
+% Median of a few frames = a noise-free picture of the empty scene.
+nShots = 5;
+shots = cell(1, nShots);
+for i = 1:nShots
+    shots{i} = grabFrame(cam, mirror);
+end
+background = median(cat(4, shots{:}), 4);
+end
+
+function s = onOff(flag)
+if flag, s = 'on'; else, s = 'off'; end
+end
+
+function s = noBgNote(background, fitEnabled)
+% Remind the user that the fit needs a background frame.
+if fitEnabled && isempty(background), s = '(press B)'; else, s = ''; end
 end
 
 function kp = detectPoseHRNet(detector, frame)
@@ -166,8 +250,9 @@ f = figure('Name', 'Click your keypoints', 'NumberTitle', 'off');
 imshow(frame);
 title({'Click on the IMAGE, in this order:', ...
        '1) shoulder on the image LEFT   2) shoulder on the image RIGHT', ...
-       '3) hip on the image RIGHT   4) hip on the image LEFT'});
-[x, y] = ginput(4);
+       '3) hip on the image RIGHT   4) hip on the image LEFT', ...
+       '5) elbow on the image LEFT   6) elbow on the image RIGHT'});
+[x, y] = ginput(6);
 close(f);
 % Build a COCO-17 array. Image-left shoulder = person's RIGHT shoulder for a
 % front-facing person (also true in the mirrored view, see getTorsoKeypoints).
@@ -176,6 +261,8 @@ kp(7,  :) = [x(1) y(1) 1];   % right shoulder
 kp(6,  :) = [x(2) y(2) 1];   % left shoulder
 kp(12, :) = [x(3) y(3) 1];   % left hip
 kp(13, :) = [x(4) y(4) 1];   % right hip
+kp(9,  :) = [x(5) y(5) 1];   % right elbow
+kp(8,  :) = [x(6) y(6) 1];   % left elbow
 end
 
 function opts = fillDefaults(opts)
