@@ -11,6 +11,7 @@ Each frame goes through: **pose keypoints → warp → light-match → feathered
 | `matchGarmentLighting.m` | Compares HSV V-channel statistics of the torso and the garment, then applies `imadjust` to the garment RGB. |
 | `getTorsoKeypoints.m` | Adapter for pose-model output: a struct, COCO-17, OpenPose-18/25 or MediaPipe-33 (pixel or normalised coordinates). |
 | `defaultTryOnConfig.m` | Holds every tunable parameter, each with a comment explaining the assumption behind it. |
+| `liveTryOn.m` | Live webcam loop: camera → pose (HRNet or manual clicks) → pipeline → window. |
 | `demo_tryOn.m` | Visual demo that runs stage by stage on a synthetic frame. You can also switch it to your own photo and click the keypoints with `ginput`. |
 | `test_tryOn.m` | 18 automated checks that print PASS/FAIL. |
 | `makeSyntheticTestData.m`, `makeTestPose.m` | Build the fake frame, keypoints, garment and pose variants (tilt / lean / turn / closer). |
@@ -18,9 +19,15 @@ Each frame goes through: **pose keypoints → warp → light-match → feathered
 ## Quick start
 ```matlab
 cd tryon
-test_tryOn      % numeric checks
-demo_tryOn      % figures 1-6, one per stage
+liveTryOn               % LIVE webcam try-on (synthetic shirt); press Q to stop
+liveTryOn('shirt.png')  % live, with your own transparent garment PNG
+test_tryOn              % numeric checks
+demo_tryOn              % static figures 1-6, one per stage (no camera)
 ```
+`liveTryOn` needs the **MATLAB Support Package for USB Webcams**. For automatic pose it
+uses `hrnetObjectKeypointDetector` (Computer Vision + Deep Learning Toolbox, R2023b+,
+"Computer Vision Toolbox Model for Object Keypoint Detection" add-on); without it, it falls
+back to clicking your shoulders/hips once. Stand far enough back that your **hips are in view**.
 
 ## Using it in App Designer
 ```matlab
