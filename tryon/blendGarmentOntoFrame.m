@@ -6,9 +6,11 @@ function [outFrame, alpha, dbg] = blendGarmentOntoFrame(frame, warpedGarment, wa
 %
 %   *** This is the project's "implement one algorithm from scratch"
 %   *** deliverable. No built-in blending/compositing function is used
-%   *** (no imfuse, imoverlay, alphablend, vision.AlphaBlender, ...). Toolbox
-%   *** calls are limited to imerode (morphology) and imfilter (convolution);
-%   *** the Gaussian kernel and the compositing maths are written by hand.
+%   *** (no imfuse, imoverlay, alphablend, vision.AlphaBlender, ...). The
+%   *** erosion (erodeBinaryDisk), the convolution (convolve2D), the Gaussian
+%   *** kernel and the compositing maths are all written by hand.
+%   *** params.useBuiltins = true swaps in imerode/imfilter instead, to
+%   *** compare against MATLAB's versions.
 %
 %   WHAT PROBLEM DOES IT SOLVE?
 %   Pasting the garment with its raw (hard, 0-or-1) mask gives a jagged,
@@ -24,9 +26,11 @@ function [outFrame, alpha, dbg] = blendGarmentOntoFrame(frame, warpedGarment, wa
 %     warpedAlphaMask  H x W alpha of the warped garment, values in [0,1].
 %     params           (optional) struct with fields
 %       .alphaThreshold  binarisation threshold for the mask   (default 0.5)
-%       .erodeRadius     disk radius for imerode, in px         (default 3)
+%       .erodeRadius     disk radius for the erosion, in px     (default 3)
 %       .gaussSigma      std-dev of the Gaussian feather, in px (default 2)
 %       .useLoops        true = explicit per-pixel loops        (default false)
+%       .useBuiltins     true = imerode/imfilter instead of our own
+%                        erodeBinaryDisk/convolve2D            (default false)
 %
 %   OUTPUTS
 %     outFrame   composited frame, same size and class as the input frame.
@@ -52,7 +56,7 @@ function [outFrame, alpha, dbg] = blendGarmentOntoFrame(frame, warpedGarment, wa
 %        This is the standard "over" operator of Porter & Duff (1984) for an
 %        opaque background.
 %
-%   See also imerode, imfilter, strel, warpGarment, tryOnPipeline.
+%   See also erodeBinaryDisk, convolve2D, warpGarment, tryOnPipeline.
 
 %% ---- Parameters (fill in any that were not given) ------------------------
 if nargin < 4 || isempty(params)
@@ -122,8 +126,12 @@ G_ROI   = G(r1:r2, c1:c2, :);
 % this before the blur means the blur's soft ramp ends up INSIDE the
 % original garment outline instead of straddling it.
 if params.erodeRadius > 0
-    se = strel('disk', params.erodeRadius, 0);   % 0 = exact disk (no approximation)
-    erodedROI = imerode(hardROI, se);
+    if params.useBuiltins
+        se = strel('disk', params.erodeRadius, 0);   % 0 = exact disk (no approximation)
+        erodedROI = imerode(hardROI, se);
+    else
+        erodedROI = erodeBinaryDisk(hardROI, params.erodeRadius);
+    end
 else
     erodedROI = hardROI;
 end
@@ -135,10 +143,14 @@ end
 % The garment image itself is NOT blurred, so its texture stays sharp.
 if params.gaussSigma > 0
     kernel = makeGaussianKernel(params.gaussSigma);
-    % imfilter = 2-D correlation (same as convolution for this symmetric
-    % kernel). 'replicate' padding: where the garment touches the frame
-    % border it stays opaque instead of fading toward a fake black border.
-    softROI = imfilter(double(erodedROI), kernel, 'replicate');
+    % 'replicate' padding: where the garment touches the frame border it
+    % stays opaque instead of fading toward a fake black border. (imfilter
+    % does correlation; for this symmetric kernel that equals convolution.)
+    if params.useBuiltins
+        softROI = imfilter(double(erodedROI), kernel, 'replicate');
+    else
+        softROI = convolve2D(double(erodedROI), kernel);
+    end
 else
     kernel  = 1;
     softROI = double(erodedROI);
@@ -226,7 +238,7 @@ end
 
 function params = fillDefaults(params)
 defaults = struct('alphaThreshold', 0.5, 'erodeRadius', 3, ...
-                  'gaussSigma', 2, 'useLoops', false);
+                  'gaussSigma', 2, 'useLoops', false, 'useBuiltins', false);
 names = fieldnames(defaults);
 for i = 1:numel(names)
     if ~isfield(params, names{i}) || isempty(params.(names{i}))
