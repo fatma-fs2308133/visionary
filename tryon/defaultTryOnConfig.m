@@ -56,14 +56,59 @@ cfg.garment.anchors.leftSleeveEnd  = [0.92 0.38];
 %% ------------------------------------------------------------------------
 %  Warping
 %  ------------------------------------------------------------------------
-% 'piecewise' : 4 points (both shoulders + both hips), quad split into two
-%               triangles, one affine transform per triangle. Handles torso
-%               turning / leaning, where the two sides of the body deform
-%               differently. (DEFAULT)
+% 'homography': 4 points (both shoulders + both hips), ONE projective
+%               transform estimated with our own normalised DLT and applied
+%               with our own inverse warping + bilinear interpolation (the
+%               from-scratch core). Models perspective when the torso turns
+%               or tilts, with no seam. (DEFAULT)
+% 'piecewise' : same 4 points, quad split into two triangles, one affine
+%               transform per triangle (MATLAB fitgeotrans + imwarp).
 % 'affine'    : 3 points (left shoulder, right shoulder, hip centre), one
 %               affine transform for the whole garment. Simpler, but a
 %               single affine cannot squash one side more than the other.
-cfg.warp.mode = 'piecewise';
+cfg.warp.mode = 'homography';
+
+%% ------------------------------------------------------------------------
+%  Preprocessing of every camera frame (preprocessFrame)
+%  ------------------------------------------------------------------------
+cfg.preprocess.enable = true;
+% Frames are resized to this width (aspect ratio kept). All pixel-based
+% parameters in this file assume 640 px. [] = keep the camera size.
+cfg.preprocess.targetWidth = 640;
+% Noise reduction: 'none' | 'gaussian' | 'median'. ASSUMPTION: a light
+% Gaussian (sigma 0.7) removes webcam sensor noise without blurring edges.
+cfg.preprocess.denoise = 'gaussian';
+cfg.preprocess.denoiseSigma = 0.7;
+% Contrast enhancement (percentile stretch + CLAHE on the luma Y of YCbCr):
+% 'auto' = only when the frame is dark or flat, 'always', or 'off'.
+cfg.preprocess.enhance = 'auto';
+% 'auto' enhances when mean grey level < lowLight or its std < lowContrast (0..1).
+% ASSUMPTION: a normally lit room gives a mean of ~0.4-0.6 and a std of
+% ~0.15-0.25; below 0.07 the picture is washed out (fog, glare, backlight).
+cfg.preprocess.lowLight    = 0.35;
+cfg.preprocess.lowContrast = 0.07;
+cfg.preprocess.claheClip   = 0.01;   % adapthisteq ClipLimit (higher = stronger)
+
+%% ------------------------------------------------------------------------
+%  Pose tracking between detections (PoseTracker)
+%  ------------------------------------------------------------------------
+% HRNet takes ~100-400 ms per frame on a CPU, which alone would keep us
+% below 10 fps. So HRNet runs every detectEvery-th frame, and in between
+% the keypoints are TRACKED with KLT optical flow (vision.PointTracker),
+% which takes a few ms. 1 = run HRNet on every frame.
+cfg.tracking.detectEvery = 5;
+cfg.tracking.useKLT      = true;
+% Exponential smoothing of the keypoints between frames (0 = none,
+% higher = steadier but laggier).
+cfg.tracking.smoothing   = 0.5;
+
+%% ------------------------------------------------------------------------
+%  Evaluation
+%  ------------------------------------------------------------------------
+% true = tryOnPipeline also returns dbg.torsoOnlyAlpha (the warped garment
+% without sleeves) for measuring the torso alignment (runExperiments).
+% Costs one extra warped channel, so it is off for live use.
+cfg.eval.torsoMask = false;
 
 %% ------------------------------------------------------------------------
 %  Sleeves follow the arms (needs elbow keypoints)
@@ -163,7 +208,7 @@ cfg.lighting.roiShrink = 0.15;
 % the binary mask that is then eroded and feathered.
 cfg.blend.alphaThreshold = 0.5;
 
-% Radius (px) of the disk used by imerode: how far the hard garment edge is
+% Radius (px) of the disk used for the erosion: how far the hard garment edge is
 % pulled inward before feathering. ASSUMPTION: 3 px at 640x480. Should be
 % about 1-2x gaussSigma so the feathered edge stays inside the original
 % garment silhouette (no dark halo from the PNG's transparent border).
@@ -178,4 +223,8 @@ cfg.blend.gaussSigma = 2;
 %         exactly like the formula; nice for the live explanation)
 % false = same maths, vectorised per colour channel (fast, use for live video)
 cfg.blend.useLoops = false;
+
+% false = our own erosion (erodeBinaryDisk) and convolution (convolve2D)
+% true  = MATLAB's imerode / imfilter (only to compare, see runExperiments E1)
+cfg.blend.useBuiltins = false;
 end

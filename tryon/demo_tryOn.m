@@ -5,7 +5,8 @@
 %
 %     Figure 1 - inputs: garment + its anchor points, frame + torso keypoints
 %     Figure 2 - WARPING: the same garment on 4 different body poses
-%     Figure 3 - WARPING: single affine vs piecewise affine on a turning torso
+%     Figure 3 - WARPING: affine vs piecewise affine vs homography (our DLT)
+%                on a turning torso
 %     Figure 4 - BLENDING: the masks (hard -> eroded -> feathered) and a
 %                zoomed comparison of a hard vs a feathered edge
 %     Figure 5 - LIGHTING: dim scene without / with lighting matching, and
@@ -117,26 +118,34 @@ for i = 1:numel(poses)
 end
 if saveFigures, print(f2, fullfile(outDir, 'fig2_poses.png'), '-dpng', '-r100'); end
 
-%% ---- Figure 3: affine vs piecewise affine on a turning torso -----------------
+%% ---- Figure 3: affine vs piecewise affine vs homography on a turning torso ----
 kpTurn = makeTestPose(kp, 'turn');
 cfgAff = cfgWarp;  cfgAff.warp.mode = 'affine';
 cfgPw  = cfgWarp;  cfgPw.warp.mode  = 'piecewise';
+cfgH   = cfgWarp;  cfgH.warp.mode   = 'homography';
 [outAff, dbgAff] = tryOnPipeline(frame, kpTurn, garmentImg, garmentAlpha, cfgAff);
 [outPw,  dbgPw ] = tryOnPipeline(frame, kpTurn, garmentImg, garmentAlpha, cfgPw);
+[outH,   dbgH  ] = tryOnPipeline(frame, kpTurn, garmentImg, garmentAlpha, cfgH);
 bodyTurn = [kpTurn.leftShoulder(1:2); kpTurn.rightShoulder(1:2); kpTurn.rightHip(1:2); kpTurn.leftHip(1:2)];
 
-f3 = figure('Name', '3 - Affine vs piecewise affine (torso turning)', 'Position', [100 100 1300 450]);
-subplot(1, 3, 1);
+f3 = figure('Name', '3 - Affine vs piecewise affine vs homography (torso turning)', ...
+            'Position', [100 100 1600 450]);
+subplot(1, 4, 1);
 imshow(outAff);  hold on;
 plot(bodyTurn([1:4 1], 1), bodyTurn([1:4 1], 2), '-o', 'Color', ptColour, 'MarkerFaceColor', ptColour);
 title({'Single affine (3 points)', 'hips cannot follow the turn'});
 
-subplot(1, 3, 2);
+subplot(1, 4, 2);
 imshow(outPw);  hold on;
 plot(bodyTurn([1:4 1], 1), bodyTurn([1:4 1], 2), '-o', 'Color', ptColour, 'MarkerFaceColor', ptColour);
-title({'Piecewise affine (2 triangles)', 'all 4 corners hit the keypoints'});
+title({'Piecewise affine (2 triangles)', 'all 4 corners hit, kink on the diagonal'});
 
-subplot(1, 3, 3);
+subplot(1, 4, 3);
+imshow(outH);  hold on;
+plot(bodyTurn([1:4 1], 1), bodyTurn([1:4 1], 2), '-o', 'Color', ptColour, 'MarkerFaceColor', ptColour);
+title({'Homography (our DLT + inverse warp)', 'all 4 corners hit, smooth perspective'});
+
+subplot(1, 4, 4);
 % Which output pixels use which triangle's transform (half-planes).
 triMap = double(dbgPw.warpInfo.useTriangle1) + 1;          % 1 or 2
 triMap(dbgPw.warpedAlpha < 0.5) = 0;                        % no garment

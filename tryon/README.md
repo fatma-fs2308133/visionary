@@ -1,73 +1,120 @@
-# Virtual try-on: Phase 2 core algorithms (MATLAB)
+# Virtual try-on (MATLAB)
 
-These are standalone functions that you can test one at a time and then call from the App Designer UI.
-Each frame goes through: **pose keypoints → torso warp → body-shape fit → sleeves follow arms →
-light-match → shading transfer → feathered blend**.
+Upload a photo of yourself (or take one with the webcam) and a picture of a garment: the system
+finds your shoulders, hips and elbows and dresses you in the garment. A live-video mode runs the
+same processing on the webcam stream. Each photo / frame goes through:
 
-| File | Purpose |
-|---|---|
-| `tryOnPipeline.m` | Top-level function for one frame. Calls the stages below in order. |
-| `warpGarment.m` | Affine warp (3 points) or piecewise-affine warp (4 points split into 2 triangles), using `fitgeotrans` + `imwarp`. |
-| `blendGarmentOntoFrame.m` | **From-scratch algorithm.** Erodes the mask, feathers it with a hand-built Gaussian kernel, then does manual alpha compositing. |
-| `matchGarmentLighting.m` | Compares HSV V-channel statistics of the torso and the garment, then applies `imadjust` to the garment RGB. |
-| `getTorsoKeypoints.m` | Adapter for pose-model output: a struct, COCO-17, OpenPose-18/25 or MediaPipe-33 (pixel or normalised coordinates). |
-| `defaultTryOnConfig.m` | Holds every tunable parameter, each with a comment explaining the assumption behind it. |
-| `fitGarmentToBody.m` | Row-by-row remap that moves the garment's side edges onto the body silhouette (chest, waist, hips). |
-| `segmentPersonBackground.m` | Person mask from background subtraction, cleaned up with `imopen`, `imclose`, `imfill` and `bwareafilt`. Used by the fit. |
-| `splitGarmentSleeves.m`, `warpSleeve.m` | Cut the sleeves off the garment and rotate each one about the shoulder so it points along the upper arm (shoulder → elbow). |
-| `transferBodyShading.m` | Copies the folds, creases and round-torso shading of the clothes you're really wearing onto the garment (the "flow"). |
-| `pickGarmentAnchors.m` | Click the 8 anchor points on your own garment PNG. Saves `<name>_anchors.mat`, which `liveTryOn` loads automatically. |
-| `liveTryOn.m` | Live webcam loop: camera → pose (HRNet or manual clicks) → pipeline → window. |
-| `demo_tryOn.m` | Visual demo that runs stage by stage on a synthetic frame. You can also switch it to your own photo and click the keypoints with `ginput`. |
-| `test_tryOn.m` | 24 automated checks that print PASS/FAIL. |
-| `makeSyntheticTestData.m`, `makeTestPose.m` | Build the fake frame, keypoints, garment and pose variants (tilt / lean / turn / closer). |
+**preprocess → pose (HRNet + KLT tracking) → person mask → homography warp (from scratch) →
+body-shape fit → sleeves follow arms → lighting match → shading transfer → feathered blend (from scratch)**
 
 ## Quick start
 ```matlab
 cd tryon
-liveTryOn               % LIVE webcam try-on (synthetic shirt); press Q to stop
-liveTryOn('shirt.png')  % live, with your own transparent garment PNG
-test_tryOn              % numeric checks
-demo_tryOn              % static figures 1-6, one per stage (no camera)
+TryOnApp            % the GUI
+test_tryOn          % 37 automated checks, prints PASS/FAIL
+demo_tryOn          % figures 1-7, one per stage (no camera needed)
+runExperiments      % all numbers + charts for the report (results/)
+liveTryOn           % lightweight live version with keyboard controls
 ```
-`liveTryOn` needs the **MATLAB Support Package for USB Webcams**. For automatic pose it
-uses `hrnetObjectKeypointDetector` (Computer Vision + Deep Learning Toolbox, R2023b+,
-"Computer Vision Toolbox Model for Object Keypoint Detection" add-on); without it, it falls
-back to clicking your shoulders/hips once. Stand far enough back that your **hips are in view**.
 
-### Live controls (click the video window first)
-| Key | Action |
+### Using the app
+1. **Your photo**: *Upload photo...* (facing the camera, shoulders to hips visible), or
+   *Take photo (webcam)*. That takes ONE snapshot after a countdown; with *Also capture empty
+   background* ticked it first photographs the scene without you, which enables the body-shape fit.
+   For an uploaded photo you can add such a picture with *Background photo (optional)...*.
+2. **Garment**: pick one, or *Upload garment picture...*: a flat, front-facing product photo on a
+   plain background, or a transparent PNG. The background is removed and the garment points are
+   found automatically (*Fix garment points...* if it sits badly).
+3. **Body points**: found automatically with HRNet (if installed); otherwise a window opens and you
+   click 6 points: shoulders, hips, elbows.
+4. Adjust the warp model / stages / sliders, then *Save result* (saved in `results/tryon/`).
+
+### Add-ons to install (Home → Add-Ons)
+| Add-on | Needed for |
 |---|---|
-| **B** | Capture the empty background. You get a 3 s countdown to step out of view. The body-shape fit needs this; press again if the lighting changes. |
-| **F / S / A / L** | Toggle body fit / shading / sleeves following arms / lighting match. Handy to show before and after in the demo. |
-| **M** | Tint the detected person mask green, to check the segmentation. |
-| **Q** | Quit. |
+| **MATLAB Support Package for USB Webcams** | *Take photo* and live video (`webcam`, `snapshot`) |
+| **Computer Vision Toolbox Model for Object Keypoint Detection** | automatic pose (`hrnetObjectKeypointDetector`) |
 
-For the best results:
-- Run `pickGarmentAnchors('shirt.png')` once for each garment.
-- Wear a plain, light shirt that contrasts with the wall. The folds and shading are copied from it, and the contrast makes the person mask cleaner.
-- Keep the camera still, and turn off auto-exposure if you can.
+Without them the app still works with uploaded photos: you click the 6 body points yourself.
 
-## Using it in App Designer
+On an Apple-silicon Mac, install the **Apple silicon** build of MATLAB. The Intel build runs under
+Rosetta emulation and is noticeably slower.
+
+## Files
+| File | Purpose |
+|---|---|
+| **Core algorithms** | |
+| `estimateHomographyDLT.m` | **From scratch.** Normalised Direct Linear Transform: builds the 2N×9 matrix A and solves Ah = 0 with the SVD. |
+| `inverseWarpBilinear.m` | **From scratch.** Inverse mapping through H⁻¹ plus hand-written bilinear interpolation. |
+| `applyHomography.m` | Maps points through a homography (homogeneous coordinates). |
+| `blendGarmentOntoFrame.m` | **From scratch.** Erodes the mask, feathers it with a hand-built Gaussian kernel, then composites with manual alpha blending. |
+| `warpGarment.m` | Places the garment in the frame: `homography` (our DLT, default), `piecewise` affine or `affine`. |
+| `tryOnPipeline.m` | Processes one frame through every stage in order. Each stage can be switched off in the config. |
+| `fitGarmentToBody.m`, `segmentPersonBackground.m` | Body-shape fit using a person mask from background subtraction. |
+| `splitGarmentSleeves.m`, `warpSleeve.m` | Cut off the sleeves and rotate each one with its upper arm. |
+| `matchGarmentLighting.m`, `transferBodyShading.m` | Match the garment's lighting to the scene, and copy the folds of the real clothes onto it. |
+| `getTorsoKeypoints.m` | Reads pose output in COCO-17, OpenPose or MediaPipe format, or a struct. |
+| `defaultTryOnConfig.m` | Every tunable parameter, with its assumption documented. |
+| **Input / real time** | |
+| `preprocessFrame.m` | Resizes to 640 px, denoises, then for dark or flat frames applies a percentile stretch plus CLAHE on luma. |
+| `PoseTracker.m` | Runs HRNet every N frames (person box from ACF or the previous keypoints) and tracks with KLT in between. Manual mode is available. |
+| `clickTorsoKeypoints.m` | Manual keypoints (6 clicks). |
+| `TryOnSession.m` | The per-frame processing shared by the GUI, the live script and the experiments. |
+| `TryOnApp.m` | The GUI: upload or take your photo, upload or pick a garment, automatic or clicked body points, photo and result side by side, person mask, status, warp model, stage toggles, sliders, save, optional live video. |
+| `liveTryOn.m` | Keyboard version. Can log per-frame timings to a CSV file. |
+| **Garments / dataset** | |
+| `prepareGarment.m` | Turns a dataset garment photo (or a whole folder) into a transparent PNG with automatic anchors. Uses VITON-HD `cloth-mask` files when present. |
+| `autoGarmentAnchors.m` | Estimates the 8 anchor points from the garment's silhouette. |
+| `pickGarmentAnchors.m` | Click the 8 anchors yourself. This overrides the automatic ones. |
+| `loadGarmentLibrary.m` | Loads every garment in `data/garments`. |
+| `makeSampleGarments.m` | Creates 5 synthetic placeholder garments, so the app works before the dataset is ready. |
+| `splitDataset.m` | Reproducible train/val/test split of the downloaded garment images. |
+| **Evaluation** | |
+| `captureTestFrames.m` | Records a test session: background, then N frames, as `data/test_frames/<person>_<condition>`. |
+| `annotateTorso.m` | Hand-mark the torso area in every frame (ground truth). |
+| `runExperiments.m` | E1 from-scratch validation, E2 detection rate, E3 torso IoU per garment and warp model, E4 speed, E5 failure cases. |
+| `test_tryOn.m`, `demo_tryOn.m`, `makeSyntheticTestData.m`, `makeTestPose.m` | Tests, stage-by-stage figures, synthetic test data. |
+
+## Workflow for the report
 ```matlab
-% startupFcn
-app.Cfg = defaultTryOnConfig();
-[app.GarmentRGB, ~, app.GarmentAlpha] = imread('shirt.png');
-% timer callback
-frame = snapshot(app.Cam);
-kp    = myPoseModel(frame);                 % external pretrained model
-out   = tryOnPipeline(frame, kp, app.GarmentRGB, app.GarmentAlpha, app.Cfg);
-app.Img.CData = out;
-% slider callbacks, e.g.
-app.Cfg.blend.gaussSigma = app.SigmaSlider.Value;
+% 1. Garments from the dataset (VITON-HD layout: .../cloth and .../cloth-mask)
+splitDataset('downloads/zalando-hd/test/cloth', 'data/garment_split');
+prepareGarment('data/garment_split/test/cloth', 'data/garments');   % then pick >= 5
+pickGarmentAnchors('data/garments/00006_00.png');                  % optional, better fit
+
+% 2. Test sessions: each member, in different conditions (with consent)
+captureTestFrames('habiba_bright');   captureTestFrames('habiba_dim');
+annotateTorso('data/test_frames/habiba_bright');
+annotateTorso('data/test_frames/habiba_dim');
+
+% 3. All numbers and charts
+runExperiments          % -> results/summary.txt, *.csv, fig_*.png
+demo_tryOn              % set saveFigures = true for the stage figures
 ```
+`runExperiments` compares the results against the Phase 1 objectives: at least 10 fps, at least
+90 % torso detection, mean torso IoU of at least 0.75, and at least 5 garments. Without annotated
+sessions it runs a **synthetic smoke test** instead, which is not a result for the report.
+
+## Live controls
+**GUI (`TryOnApp`):** everything is a button, a checkbox or a slider. In live video, *Background
+photo* starts a 3-second countdown: step out of view.
+
+**`liveTryOn` keys:** B background · G next garment · W next warp model · F fit · S shading ·
+A sleeves · L lighting · P preprocessing · M mask · K click keypoints again · Q quit.
 
 ## Key judgement calls
 All of these are documented in the code, so you can change them.
-- **Piecewise split:** the quad is cut along the diagonal from the left shoulder to the right hip. Each triangle's affine transform then covers its whole half-plane, so the sleeves and collar outside the quad still get warped. The two transforms agree along the diagonal, so there is no seam.
-- **Blend defaults:** erosion radius 3 px, Gaussian sigma 2 px (kernel 13×13), mask threshold 0.5. These are tuned for 640×480 input; roughly double them at 720p.
-- **Lighting strength 0.6:** the torso region also includes the colour of the shirt the user is really wearing. Matching 100% would turn a white garment grey on someone dressed in black.
-- **Shape fit:** strength 0.8 plus 4 px "ease", so the T-shirt stays slightly looser than skin. It starts at armpit height and fades in, so the shoulders aren't distorted.
-- **Shading:** strength 0.8. Anything smaller than about 30 px (2 × `baseSigma`) counts as a fold. A print on your real shirt partly shows through, so lower the strength if that happens.
-- **Sleeves:** each sleeve is treated as a rigid piece hinged at the shoulder. If an elbow isn't detected, that sleeve simply moves with the torso.
-- **Garment anchors:** stored as normalised positions on the garment PNG (for a front-facing shirt, the wearer's left is on the image right). Adjust them for each garment; figure 1 of the demo shows where they sit.
+- **Homography as the default warp.** It is one smooth projective map of the torso plane, so it
+  handles turning and tilting with no seam. Piecewise affine has a kink along the diagonal, and a
+  single affine can't narrow one side of the torso. `runExperiments` compares all three.
+- **Detect + track.** HRNet is too slow on a CPU to run on every frame, so it runs every 5 frames
+  and KLT tracks the keypoints in between. If tracking loses a torso point, HRNet runs again on
+  the next frame.
+- **Blend defaults:** erosion radius 3 px, Gaussian sigma 2 px, tuned for 640×480. Frames are
+  resized to 640 px wide, so these hold for any camera.
+- **Lighting strength 0.6:** the torso region measured in the frame also contains the colour of
+  the shirt the user is really wearing.
+- **Shape fit:** strength 0.8 plus 4 px "ease", starting at armpit height.
+- **Shading:** strength 0.8. Works best when the real shirt underneath is plain and light.
+- **Garment anchors:** stored as normalised positions. They are estimated automatically, and
+  `pickGarmentAnchors` overrides them.
