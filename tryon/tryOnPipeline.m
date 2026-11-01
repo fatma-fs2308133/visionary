@@ -6,7 +6,8 @@ function [outFrame, dbg] = tryOnPipeline(webcamFrame, poseKeypoints, garmentImg,
 %   [outFrame, dbg] = tryOnPipeline(..., cfg, bodyMask)
 %
 %   STAGES
-%     1. torso warp        warpGarment          (piecewise affine, 4 keypoints)
+%     1. torso warp        warpGarment          (homography from scratch by
+%                                                default, or piecewise/affine)
 %     2. body-shape fit    fitGarmentToBody     (only if bodyMask is given)
 %     3. sleeves           warpSleeve           (rotate with the upper arms,
 %                                                only if elbows are detected)
@@ -30,6 +31,10 @@ function [outFrame, dbg] = tryOnPipeline(webcamFrame, poseKeypoints, garmentImg,
 %                torso is not detected (or the pose is degenerate) the
 %                original frame is returned unchanged.
 %     dbg        struct with all intermediate results, for the demo / debug.
+%                dbg.timing holds the time of every stage in seconds.
+%                With cfg.eval.torsoMask = true, dbg.torsoOnlyAlpha is the
+%                warped garment WITHOUT its sleeves (used to measure the
+%                torso alignment against hand-marked frames).
 %
 %   See also defaultTryOnConfig, liveTryOn.
 
@@ -43,7 +48,13 @@ cfg = fillMissingSections(cfg);
 
 outFrame = webcamFrame;               % fallback result: frame untouched
 dbg = struct('ok', false, 'reason', '');
+dbg.timing = struct('warp', 0, 'fit', 0, 'sleeves', 0, 'lighting', 0, ...
+                    'shading', 0, 'blend', 0, 'total', 0);
+tTotal = tic;
 frameSize = size(webcamFrame);
+if ~isempty(bodyMask) && ~isequal(size(bodyMask), frameSize(1:2))
+    bodyMask = [];                    % stale mask (frame size changed): ignore
+end
 
 %% ---- 0. Keypoints ---------------------------------------------------------------
 torso = getTorsoKeypoints(poseKeypoints, frameSize, cfg.pose.minScore);
@@ -54,43 +65,64 @@ if ~torso.valid
 end
 
 %% ---- 1. Point correspondences + torso warp ------------------------------------
+t = tic;
 anchorsPx = anchorsToPixels(cfg.garment.anchors, size(garmentImg));
 [srcPts, dstPts] = buildCorrespondences(torso, anchorsPx, cfg.warp.mode);
 dbg.srcPts = srcPts;
 dbg.dstPts = dstPts;
 
 % Which sleeves get their own (arm-following) transform?
-doLeft  = cfg.sleeves.enable && torso.hasLeftElbow  && isfield(anchorsPx, 'leftSleeveEnd');
-doRight = cfg.sleeves.enable && torso.hasRightElbow && isfield(anchorsPx, 'rightSleeveEnd');
+canSplit = all(isfield(anchorsPx, {'leftArmpit', 'rightArmpit', 'leftSleeveEnd', 'rightSleeveEnd'}));
+doLeft  = cfg.sleeves.enable && torso.hasLeftElbow  && canSplit;
+doRight = cfg.sleeves.enable && torso.hasRightElbow && canSplit;
+wantTorsoMask = cfg.eval.torsoMask;
 torsoAlphaG = im2double(garmentAlpha);
 if size(torsoAlphaG, 3) > 1, torsoAlphaG = torsoAlphaG(:, :, 1); end
-if doLeft || doRight
+torsoOnlyG = torsoAlphaG;
+if canSplit && (doLeft || doRight || wantTorsoMask)
     parts = splitGarmentSleeves(torsoAlphaG, anchorsPx);
-    % A sleeve that is NOT articulated stays part of the torso layer.
-    torsoAlphaG = parts.torso;
-    if ~doLeft,  torsoAlphaG = max(torsoAlphaG, parts.leftSleeve);  end
-    if ~doRight, torsoAlphaG = max(torsoAlphaG, parts.rightSleeve); end
+    torsoOnlyG = parts.torso;
+    if doLeft || doRight
+        % A sleeve that is NOT articulated stays part of the torso layer.
+        torsoAlphaG = parts.torso;
+        if ~doLeft,  torsoAlphaG = max(torsoAlphaG, parts.leftSleeve);  end
+        if ~doRight, torsoAlphaG = max(torsoAlphaG, parts.rightSleeve); end
+    end
+end
+alphaStack = torsoAlphaG;
+if wantTorsoMask
+    alphaStack = cat(3, torsoAlphaG, torsoOnlyG);   % warped with the same transform
 end
 
 try
-    [layerRGB, layerAlpha, warpInfo] = warpGarment(garmentImg, torsoAlphaG, srcPts, dstPts, frameSize);
+    [layerRGB, warpedAlphas, warpInfo] = warpGarment(garmentImg, alphaStack, srcPts, dstPts, ...
+                                                      frameSize, cfg.warp.mode);
 catch err
-    % e.g. a degenerate triangle when the person stands exactly side-on:
-    % skip the overlay for this frame instead of crashing the live app.
+    % e.g. a degenerate triangle/quad when the person stands exactly
+    % side-on: skip the overlay for this frame instead of crashing the app.
     dbg.reason = err.message;
     return
 end
+layerAlpha = warpedAlphas(:, :, 1);
+torsoOnly = [];
+if wantTorsoMask, torsoOnly = warpedAlphas(:, :, 2); end
 dbg.warpedRGB   = layerRGB;
 dbg.warpedAlpha = layerAlpha;
 dbg.warpInfo    = warpInfo;
+dbg.timing.warp = toc(t);
 
 %% ---- 2. Fit the torso part to the body silhouette -----------------------------
+t = tic;
 dbg.fitInfo = struct('ok', false);
 if cfg.fit.enable && ~isempty(bodyMask)
-    [layerRGB, layerAlpha, dbg.fitInfo] = fitGarmentToBody(layerRGB, layerAlpha, bodyMask, torso, cfg.fit);
+    [layerRGB, layerAlpha, dbg.fitInfo, torsoOnly] = ...
+        fitGarmentToBody(layerRGB, layerAlpha, bodyMask, torso, cfg.fit, torsoOnly);
 end
+dbg.torsoOnlyAlpha = torsoOnly;
+dbg.timing.fit = toc(t);
 
 %% ---- 3. Sleeves follow the upper arms -------------------------------------------
+t = tic;
 % Garment -> frame scale from the shoulder width, for the sleeve length.
 scale = norm(torso.leftShoulder - torso.rightShoulder) / ...
         max(norm(anchorsPx.leftShoulder - anchorsPx.rightShoulder), eps);
@@ -110,8 +142,10 @@ for i = 1:2
     layerRGB   = sRGB .* sAlpha + layerRGB .* (1 - sAlpha);
     layerAlpha = sAlpha + layerAlpha .* (1 - sAlpha);
 end
+dbg.timing.sleeves = toc(t);
 
 %% ---- 4. Global lighting match ---------------------------------------------------
+t = tic;
 torsoRoi = torsoBoundingBox(dstPts, frameSize, cfg.lighting.roiShrink);
 lightStats = [];
 if cfg.lighting.enable
@@ -119,23 +153,29 @@ if cfg.lighting.enable
     [layerRGB, lightStats] = matchGarmentLighting(layerRGB, torsoCrop, layerAlpha, cfg.lighting);
 end
 dbg.litRGB = layerRGB;
+dbg.timing.lighting = toc(t);
 
 %% ---- 5. Shading transfer (folds, roundness) ------------------------------------
+t = tic;
 shade = [];
 if cfg.shading.enable
     [layerRGB, shade] = transferBodyShading(layerRGB, layerAlpha, webcamFrame, cfg.shading);
 end
+dbg.timing.shading = toc(t);
 
 %% ---- 6. Feathered alpha blend onto the frame --------------------------------
+t = tic;
 if nargout > 1
     [outFrame, finalAlpha, blendDbg] = blendGarmentOntoFrame(webcamFrame, layerRGB, layerAlpha, cfg.blend);
 else
     outFrame = blendGarmentOntoFrame(webcamFrame, layerRGB, layerAlpha, cfg.blend);
 end
+dbg.timing.blend = toc(t);
+dbg.timing.total = toc(tTotal);
+dbg.ok = true;
 
 %% ---- Debug output -------------------------------------------------------------
 if nargout > 1
-    dbg.ok          = true;
     dbg.layerRGB    = layerRGB;          % final garment layer before blending
     dbg.layerAlpha  = layerAlpha;
     dbg.torsoRoi    = torsoRoi;          % [rowStart rowEnd colStart colEnd]
@@ -162,7 +202,7 @@ end
 function [srcPts, dstPts] = buildCorrespondences(torso, a, mode)
 % Pair garment anchors with body keypoints in the order warpGarment expects.
 switch lower(mode)
-    case 'piecewise'
+    case {'piecewise', 'homography'}
         % Around the quad: LS, RS, RH, LH (see warpGarment).
         srcPts = [a.leftShoulder; a.rightShoulder; a.rightHip; a.leftHip];
         dstPts = [torso.leftShoulder; torso.rightShoulder; torso.rightHip; torso.leftHip];
@@ -204,3 +244,4 @@ for i = 1:numel(sections)
     end
 end
 end
+
