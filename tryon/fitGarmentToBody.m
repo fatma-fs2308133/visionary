@@ -1,4 +1,4 @@
-function [fitRGB, fitAlpha, info] = fitGarmentToBody(warpedRGB, warpedAlpha, bodyMask, torso, params)
+function [fitRGB, fitAlpha, info, fitExtra] = fitGarmentToBody(warpedRGB, warpedAlpha, bodyMask, torso, params, extraLayers)
 %FITGARMENTTOBODY  Bend the garment's side edges onto the body silhouette.
 %
 %   [fitRGB, fitAlpha, info] = fitGarmentToBody(warpedRGB, warpedAlpha, ...
@@ -27,13 +27,20 @@ function [fitRGB, fitAlpha, info] = fitGarmentToBody(warpedRGB, warpedAlpha, bod
 %     bodyMask   logical person mask (segmentPersonBackground).
 %     torso      struct from getTorsoKeypoints.
 %     params     cfg.fit (see defaultTryOnConfig).
+%     extraLayers (optional) H x W x K images that get exactly the same
+%                remap (e.g. the torso-only alpha used for evaluation).
 %
 %   OUTPUTS
 %     fitRGB, fitAlpha  re-shaped garment layer (same size as input).
 %     info              struct: rows, gL, gR, tL, tR (for plotting), ok.
+%     fitExtra          extraLayers after the same remap ([] if not given).
 
+if nargin < 6
+    extraLayers = [];
+end
 fitRGB = warpedRGB;
 fitAlpha = warpedAlpha;
+fitExtra = extraLayers;
 info = struct('ok', false, 'rows', [], 'gL', [], 'gR', [], 'tL', [], 'tR', []);
 if isempty(bodyMask) || ~any(bodyMask(:))
     return
@@ -124,6 +131,11 @@ end
 fitAlpha(rows, :) = interp2(warpedAlpha, srcX(rows, :), Y(rows, :), 'linear', 0);
 for c = 1:size(warpedRGB, 3)
     fitRGB(rows, :, c) = interp2(warpedRGB(:, :, c), srcX(rows, :), Y(rows, :), 'linear', 0);
+end
+if ~isempty(extraLayers)
+    for c = 1:size(extraLayers, 3)
+        fitExtra(rows, :, c) = interp2(extraLayers(:, :, c), srcX(rows, :), Y(rows, :), 'linear', 0);
+    end
 end
 
 info = struct('ok', true, 'rows', rows, 'gL', gL, 'gR', gR, 'tL', tL, 'tR', tR);

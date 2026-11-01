@@ -1,8 +1,9 @@
-function [warpedRGB, warpedAlpha, info] = warpGarment(garmentImg, garmentAlpha, srcPts, dstPts, outputSize)
+function [warpedRGB, warpedAlpha, info] = warpGarment(garmentImg, garmentAlpha, srcPts, dstPts, outputSize, mode)
 %WARPGARMENT  Warp a garment image and its alpha mask onto body landmarks.
 %
 %   [warpedRGB, warpedAlpha, info] = warpGarment(garmentImg, garmentAlpha, ...
 %                                                srcPts, dstPts, outputSize)
+%   [...] = warpGarment(..., mode)     mode = 'affine' | 'piecewise' | 'homography'
 %
 %   The garment is mapped from its own image (source points = anchor points
 %   on the garment PNG) into the webcam frame (destination points = pose
@@ -11,25 +12,39 @@ function [warpedRGB, warpedAlpha, info] = warpGarment(garmentImg, garmentAlpha, 
 %
 %   INPUTS
 %     garmentImg    H_g x W_g x 3 garment RGB (any class; converted to double).
-%     garmentAlpha  H_g x W_g alpha / transparency mask (0 = transparent).
+%     garmentAlpha  H_g x W_g x K alpha mask(s) (0 = transparent). Usually
+%                   K = 1; extra channels (e.g. a torso-only mask used for
+%                   evaluation) are warped with exactly the same transform.
 %     srcPts        Points on the garment image, [x y] per row (pixels).
 %     dstPts        Matching points in the webcam frame, [x y] per row.
-%                   The number of rows selects the model:
-%       3 rows -> ONE affine transform ("triangle" mode)
-%                 order: [leftShoulder; rightShoulder; hipCentre]
-%       4 rows -> PIECEWISE affine, quad split into two triangles
-%                 order (around the quad): [leftShoulder; rightShoulder;
-%                                           rightHip; leftHip]
+%     mode          (optional) the transform model. Default: chosen from the
+%                   number of rows (3 -> 'affine', 4 -> 'piecewise').
+%       'affine'     3 rows -> ONE affine transform ("triangle" mode)
+%                    order: [leftShoulder; rightShoulder; hipCentre]
+%       'piecewise'  4 rows -> PIECEWISE affine, quad split into two
+%                    triangles. Order (around the quad): [leftShoulder;
+%                    rightShoulder; rightHip; leftHip]
+%       'homography' 4+ rows (same order) -> ONE projective transform,
+%                    estimated with our own DLT (estimateHomographyDLT) and
+%                    applied with our own inverse warping + bilinear
+%                    interpolation (inverseWarpBilinear). FROM SCRATCH.
 %     outputSize    size(frame): the warped images get this height/width so
 %                   they line up pixel-for-pixel with the frame.
 %
 %   OUTPUTS
 %     warpedRGB     outputSize(1) x outputSize(2) x 3, double in [0,1].
-%     warpedAlpha   outputSize(1) x outputSize(2), double in [0,1]; 0 wherever
-%                   the garment does not land.
-%     info          struct: mode, tforms (cell of affine2d), triangles (vertex
-%                   indices), and for piecewise mode useTriangle1 (logical
-%                   map of which output pixels use triangle 1). For the demo.
+%     warpedAlpha   outputSize(1) x outputSize(2) x K, double in [0,1]; 0
+%                   wherever the garment does not land.
+%     info          struct: mode, tforms (cell of affine2d, affine modes) or
+%                   H (3x3, homography mode), triangles (vertex indices), and
+%                   for piecewise mode useTriangle1 (logical map of which
+%                   output pixels use triangle 1). For the demo.
+%
+%   WHY A HOMOGRAPHY?
+%   An affine map keeps parallel lines parallel. A homography (8 degrees of
+%   freedom) maps ANY convex quad onto any other convex quad, so it models
+%   the perspective of a torso plane that turns or tilts toward the camera
+%   with a single smooth transform - no seam, unlike the piecewise affine.
 %
 %   WHY PIECEWISE?
 %   A single affine transform keeps parallel lines parallel, so it can
@@ -66,22 +81,56 @@ end
 % ---- Input conditioning ----------------------------------------------------
 garmentImg   = im2double(garmentImg);
 garmentAlpha = im2double(garmentAlpha);
-if size(garmentAlpha, 3) > 1
-    garmentAlpha = garmentAlpha(:, :, 1);
-end
 srcPts = double(srcPts);
 dstPts = double(dstPts);
 if ~isequal(size(srcPts), size(dstPts)) || size(srcPts, 2) ~= 2
     error('warpGarment:badPoints', 'srcPts and dstPts must both be N-by-2 with equal N.');
+end
+if nargin < 6 || isempty(mode)
+    if size(srcPts, 1) == 3, mode = 'affine'; else, mode = 'piecewise'; end
+end
+mode = lower(mode);
+expected = struct('affine', 3, 'piecewise', 4, 'homography', 4);
+if ~isfield(expected, mode)
+    error('warpGarment:mode', 'Unknown mode "%s" (use affine, piecewise or homography).', mode);
+end
+if size(srcPts, 1) < expected.(mode) || (~strcmp(mode, 'homography') && size(srcPts, 1) ~= expected.(mode))
+    error('warpGarment:badPoints', 'Mode "%s" needs %d points, got %d.', ...
+          mode, expected.(mode), size(srcPts, 1));
 end
 
 % The output "canvas" is the webcam frame: world coordinates = pixel
 % coordinates of the frame (x = column, y = row).
 outputView = imref2d(outputSize(1:2));
 
-switch size(srcPts, 1)
+switch mode
     % ======================================================================
-    case 3      % ---- single affine transform from one triangle -----------
+    case 'homography'   % ---- one projective transform, all from scratch --
+        if size(dstPts, 1) == 4
+            checkConvexQuad(dstPts);
+        end
+        [H, fitInfo] = estimateHomographyDLT(srcPts, dstPts);
+
+        % Only compute output pixels inside the bounding box of the warped
+        % garment (much faster than the whole frame).
+        roi = homographyRoi(H, garmentAlpha, outputSize);
+
+        % Warp colour and alpha in ONE call so they are sampled at exactly
+        % the same positions.
+        nA = size(garmentAlpha, 3);
+        stacked = inverseWarpBilinear(cat(3, garmentImg, garmentAlpha), H, outputSize, roi);
+        warpedRGB   = stacked(:, :, 1:3);
+        warpedAlpha = stacked(:, :, 4:3 + nA);
+
+        info.mode        = 'homography';
+        info.H           = H;
+        info.tforms      = {};
+        info.triangles   = {1:size(srcPts, 1)};
+        info.reprojError = fitInfo.reprojError;
+        info.roi         = roi;
+
+    % ======================================================================
+    case 'affine'       % ---- single affine transform from one triangle ---
         checkTriangle(srcPts, 'source');
         checkTriangle(dstPts, 'destination');
 
@@ -96,7 +145,7 @@ switch size(srcPts, 1)
         info.triangles = {[1 2 3]};
 
     % ======================================================================
-    case 4      % ---- piecewise affine: quad -> two triangles --------------
+    case 'piecewise'    % ---- piecewise affine: quad -> two triangles ------
         tri1 = [1 2 3];     % leftShoulder, rightShoulder, rightHip
         tri2 = [1 3 4];     % leftShoulder, rightHip,      leftHip
         checkTriangle(srcPts(tri1, :), 'source triangle 1');
@@ -135,10 +184,6 @@ switch size(srcPts, 1)
         info.tforms       = {tform1, tform2};
         info.triangles    = {tri1, tri2};
         info.useTriangle1 = useTriangle1;
-
-    otherwise
-        error('warpGarment:badPoints', ...
-            'Use 3 points (single affine) or 4 points (piecewise affine), got %d.', size(srcPts, 1));
 end
 
 % Interpolation can overshoot very slightly; keep everything in [0,1].
@@ -167,4 +212,49 @@ twiceArea = abs(v1(1) * v2(2) - v1(2) * v2(1));
 if twiceArea < 1        % less than half a square pixel
     error('warpGarment:degenerate', 'The %s is degenerate (points are collinear).', label);
 end
+end
+
+% ==========================================================================
+function checkConvexQuad(P)
+% The body quad [LS RS RH LH] must be convex: all 4 corners turn the same
+% way. A crossed or dented quad (e.g. a wrong keypoint, or the person seen
+% from the back with left/right swapped) has no sensible homography, so we
+% fail and tryOnPipeline skips the overlay for this frame.
+turns = zeros(1, 4);
+for k = 1:4
+    a = P(k, :);
+    b = P(mod(k, 4) + 1, :);
+    c = P(mod(k + 1, 4) + 1, :);
+    turns(k) = (b(1) - a(1)) * (c(2) - b(2)) - (b(2) - a(2)) * (c(1) - b(1));
+end
+if ~(all(turns > 1) || all(turns < -1))
+    error('warpGarment:degenerate', 'The body keypoints do not form a convex quad.');
+end
+end
+
+function roi = homographyRoi(H, alpha, outputSize)
+% Output rows/cols that the visible part of the garment can reach: map the
+% corners of the garment's bounding box with H and take their bounding box
+% (a homography maps a convex quad to a convex quad, so the corners bound
+% everything). Falls back to the whole frame if a corner maps behind the
+% horizon (w <= 0).
+visible = any(alpha > 0, 3);
+rows = find(any(visible, 2));
+cols = find(any(visible, 1));
+fullFrame = [1 outputSize(1) 1 outputSize(2)];
+if isempty(rows)
+    roi = [1 0 1 0];                      % empty: nothing to draw
+    return
+end
+corners = [cols(1) rows(1); cols(end) rows(1); cols(end) rows(end); cols(1) rows(end)];
+ph = [corners, ones(4, 1)] * H';
+centre = [mean(cols), mean(rows), 1] * H';
+if any(sign(ph(:, 3)) ~= sign(centre(3))) || any(abs(ph(:, 3)) < eps)
+    roi = fullFrame;
+    return
+end
+q = ph(:, 1:2) ./ ph(:, 3);
+roi = [floor(min(q(:, 2))) - 1, ceil(max(q(:, 2))) + 1, ...
+       floor(min(q(:, 1))) - 1, ceil(max(q(:, 1))) + 1];
+roi = [max(roi(1), 1), min(roi(2), outputSize(1)), max(roi(3), 1), min(roi(4), outputSize(2))];
 end
