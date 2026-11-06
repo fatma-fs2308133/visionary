@@ -60,7 +60,8 @@ Rosetta emulation and is noticeably slower.
 | `PoseTracker.m` | Runs HRNet every N frames (person box from ACF or the previous keypoints) and tracks with KLT in between. Manual mode is available. |
 | `clickTorsoKeypoints.m` | Manual keypoints (6 clicks). |
 | `TryOnSession.m` | The per-frame processing shared by the GUI, the live script and the experiments. |
-| `TryOnApp.m` | The GUI: upload or take your photo, upload or pick a garment, automatic or clicked body points, photo and result side by side, person mask, status, warp model, stage toggles, sliders, save, optional live video. |
+| `TryOnApp.m` | The GUI: upload or take your photo, upload or pick a garment, automatic or clicked body points, photo and result side by side, person mask, status, warp model, stage toggles, sliders, save, optional live video. *Studio render* asks the local Python server for a photorealistic render. |
+| `studioRender.m` | Sends the photo and garment to the local studio server (`webapp`, `POST /api/studio/render`) with `webwrite` and returns the result. Start the server first: `cd webapp; .venv/bin/uvicorn server:app`. |
 | `liveTryOn.m` | Keyboard version. Can log per-frame timings to a CSV file. |
 | **Garments / dataset** | |
 | `prepareGarment.m` | Turns a dataset garment photo (or a whole folder) into a transparent PNG with automatic anchors. Uses VITON-HD `cloth-mask` files when present. |

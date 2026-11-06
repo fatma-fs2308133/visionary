@@ -1,0 +1,231 @@
+{
+ "measurements": [
+  {
+   "body": "A",
+   "landmark": "chest",
+   "height_cm": 124.0,
+   "true_girth": 85.32293758581935,
+   "multi_view": 89.8736729383847,
+   "single_view": 90.74038787753685,
+   "true_width": 30.910539802038084,
+   "measured_width": 33.71765249715559,
+   "true_depth": 22.46323881222849,
+   "multi_depth": 22.989142814534894,
+   "single_depth": 23.602356748008912
+  },
+  {
+   "body": "A",
+   "landmark": "waist",
+   "height_cm": 104.0,
+   "true_girth": 73.72947638562607,
+   "multi_view": 73.94202147995529,
+   "single_view": 75.18958270752462,
+   "true_width": 27.415467534552306,
+   "measured_width": 27.939226186248845,
+   "true_depth": 18.237410019744175,
+   "multi_depth": 18.67196531791908,
+   "single_depth": 19.55745833037419
+  },
+  {
+   "body": "A",
+   "landmark": "hip",
+   "height_cm": 88.0,
+   "true_girth": 89.87260247669973,
+   "multi_view": 92.10267461470119,
+   "single_view": 96.36925654151253,
+   "true_width": 32.99855561558378,
+   "measured_width": 35.809248554913296,
+   "true_depth": 21.998555615583783,
+   "multi_depth": 21.997109826589593,
+   "single_depth": 25.066473988439306
+  },
+  {
+   "body": "B",
+   "landmark": "chest",
+   "height_cm": 122.0,
+   "true_girth": 88.43329048667752,
+   "multi_view": 90.42216194356735,
+   "single_view": 84.39744885046917,
+   "true_width": 30.235423013911504,
+   "measured_width": 31.36071950482641,
+   "true_depth": 25.427115069557495,
+   "multi_depth": 26.082528023897275,
+   "single_depth": 21.952503653378486
+  },
+  {
+   "body": "B",
+   "landmark": "waist",
+   "height_cm": 104.0,
+   "true_girth": 83.26099829277047,
+   "multi_view": 83.86934093839426,
+   "single_view": 75.18958270752462,
+   "true_width": 27.415467534552306,
+   "measured_width": 27.939226186248845,
+   "true_depth": 25.029676252468025,
+   "multi_depth": 25.424033979116626,
+   "single_depth": 19.55745833037419
+  },
+  {
+   "body": "B",
+   "landmark": "hip",
+   "height_cm": 88.0,
+   "true_girth": 96.68999780837936,
+   "multi_view": 99.31012775233191,
+   "single_view": 96.36925654151253,
+   "true_width": 32.99855561558378,
+   "measured_width": 35.809248554913296,
+   "true_depth": 26.666185205194598,
+   "multi_depth": 27.11271676300578,
+   "single_depth": 25.066473988439306
+  }
+ ],
+ "orientation": [
+  {
+   "true_yaw": 10,
+   "silhouette_width_change_pct": -0.4,
+   "yaw_from_silhouette_widths": 7.5,
+   "yaw_from_shoulder_ratio": 10.0,
+   "yaw_uncertainty_per_1pct_keypoint_error": 3.3
+  },
+  {
+   "true_yaw": 20,
+   "silhouette_width_change_pct": -2.2,
+   "yaw_from_silhouette_widths": 16.5,
+   "yaw_from_shoulder_ratio": 20.0,
+   "yaw_uncertainty_per_1pct_keypoint_error": 1.7
+  },
+  {
+   "true_yaw": 30,
+   "silhouette_width_change_pct": 5.5,
+   "yaw_from_silhouette_widths": 0.0,
+   "yaw_from_shoulder_ratio": 30.0,
+   "yaw_uncertainty_per_1pct_keypoint_error": 1.1
+  }
+ ],
+ "placement": {
+  "fila_crop_tee": [
+   {
+    "yaw": 0,
+    "size": "S",
+    "garment_girth_cm": 84.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": -5.9,
+    "strain_3d_pct": 4.8,
+    "print_scale_vs_ref_2d": 0.779,
+    "print_scale_vs_ref_3d": 1.047,
+    "centre_front_error_cm_2d": 0.0,
+    "centre_front_error_cm_3d": 0.0,
+    "chest_width_cm_body": 31.0,
+    "chest_width_cm_3d": 32.5,
+    "chest_width_cm_ref": 30.0
+   },
+   {
+    "yaw": 0,
+    "size": "L",
+    "garment_girth_cm": 100.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": 10.1,
+    "strain_3d_pct": 0.0,
+    "print_scale_vs_ref_2d": 0.664,
+    "print_scale_vs_ref_3d": 1.0,
+    "centre_front_error_cm_2d": 0.0,
+    "centre_front_error_cm_3d": 0.0,
+    "chest_width_cm_body": 31.0,
+    "chest_width_cm_3d": 36.0,
+    "chest_width_cm_ref": 34.8
+   },
+   {
+    "yaw": 25,
+    "size": "S",
+    "garment_girth_cm": 84.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": -5.9,
+    "strain_3d_pct": 4.8,
+    "print_scale_vs_ref_2d": 0.778,
+    "print_scale_vs_ref_3d": 1.046,
+    "centre_front_error_cm_2d": -5.3,
+    "centre_front_error_cm_3d": 0.2,
+    "chest_width_cm_body": 38.2,
+    "chest_width_cm_3d": 30.5,
+    "chest_width_cm_ref": 28.8
+   },
+   {
+    "yaw": 25,
+    "size": "L",
+    "garment_girth_cm": 100.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": 10.1,
+    "strain_3d_pct": 0.0,
+    "print_scale_vs_ref_2d": 0.664,
+    "print_scale_vs_ref_3d": 0.999,
+    "centre_front_error_cm_2d": -5.3,
+    "centre_front_error_cm_3d": 0.9,
+    "chest_width_cm_body": 38.2,
+    "chest_width_cm_3d": 32.8,
+    "chest_width_cm_ref": 32.2
+   }
+  ],
+  "colour_block_polo": [
+   {
+    "yaw": 0,
+    "size": "S",
+    "garment_girth_cm": 84.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": -5.9,
+    "strain_3d_pct": 4.8,
+    "print_scale_vs_ref_2d": 0.813,
+    "print_scale_vs_ref_3d": 1.047,
+    "centre_front_error_cm_2d": 0.0,
+    "centre_front_error_cm_3d": 0.0,
+    "chest_width_cm_body": 31.0,
+    "chest_width_cm_3d": 32.5,
+    "chest_width_cm_ref": 30.0
+   },
+   {
+    "yaw": 0,
+    "size": "L",
+    "garment_girth_cm": 100.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": 10.1,
+    "strain_3d_pct": 0.0,
+    "print_scale_vs_ref_2d": 0.693,
+    "print_scale_vs_ref_3d": 1.0,
+    "centre_front_error_cm_2d": 0.0,
+    "centre_front_error_cm_3d": 0.0,
+    "chest_width_cm_body": 31.0,
+    "chest_width_cm_3d": 36.0,
+    "chest_width_cm_ref": 34.8
+   },
+   {
+    "yaw": 25,
+    "size": "S",
+    "garment_girth_cm": 84.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": -5.9,
+    "strain_3d_pct": 4.8,
+    "print_scale_vs_ref_2d": 0.812,
+    "print_scale_vs_ref_3d": 1.046,
+    "centre_front_error_cm_2d": -5.3,
+    "centre_front_error_cm_3d": 0.2,
+    "chest_width_cm_body": 38.2,
+    "chest_width_cm_3d": 30.5,
+    "chest_width_cm_ref": 28.8
+   },
+   {
+    "yaw": 25,
+    "size": "L",
+    "garment_girth_cm": 100.0,
+    "body_chest_girth_cm (measured)": 89.9,
+    "ease_cm": 10.1,
+    "strain_3d_pct": 0.0,
+    "print_scale_vs_ref_2d": 0.692,
+    "print_scale_vs_ref_3d": 0.999,
+    "centre_front_error_cm_2d": -5.3,
+    "centre_front_error_cm_3d": 0.9,
+    "chest_width_cm_body": 38.2,
+    "chest_width_cm_3d": 32.8,
+    "chest_width_cm_ref": 32.2
+   }
+  ]
+ }
+}

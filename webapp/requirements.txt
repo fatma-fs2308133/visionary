@@ -1,0 +1,16 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+numpy>=1.26,<3
+opencv-python-headless>=4.9
+mediapipe>=0.10.14
+pillow>=10.0
+httpx>=0.27
+gradio_client>=1.3
+rembg[cpu]>=2.0.60
+# studio render (local CatVTON) and parsing
+torch>=2.4
+transformers>=4.45
+diffusers>=0.31
+accelerate>=0.34
+safetensors>=0.4

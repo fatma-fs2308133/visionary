@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+models/
+# generated garment library (rebuilt from data/catalog on server start)
+data/garments/
+# H&M photos: research-only licence, not for a public repo (data/fetch_hm.py downloads them)
+data/catalog/hm_*.jpg
+# experiment outputs that are regenerated
+eval/results/**/*_masks.npz

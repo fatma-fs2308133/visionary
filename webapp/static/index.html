@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Visionary Atelier</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23141414'/%3E%3Ctext x='16' y='22' font-family='Georgia' font-size='17' fill='%23F5F2EC' text-anchor='middle'%3EV%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="wordmark" href="/" aria-label="Visionary Atelier, home">
+      <span class="wm-main">VISIONARY</span>
+      <span class="wm-sub">Atelier</span>
+    </a>
+    <nav class="modes" role="tablist" aria-label="Mode">
+      <button role="tab" aria-selected="true" data-mode="photo">Photo</button>
+      <button role="tab" aria-selected="false" data-mode="live">Live mirror</button>
+    </nav>
+    <p class="status" id="status" role="status" aria-live="polite"><span class="dot"></span><span id="status-text">Ready</span></p>
+  </header>
+
+  <main class="atelier">
+    <!-- ================= Stage ================= -->
+    <section class="stage-col" aria-label="Preview">
+      <div class="stage" id="stage">
+        <!-- empty photo state -->
+        <label class="welcome" id="photo-drop">
+          <input type="file" id="photo-file" accept="image/*" hidden>
+          <span class="eyebrow">Step one</span>
+          <h1>Your fitting<br><em>begins with a portrait.</em></h1>
+          <p>Drop a photo of yourself, facing the camera with shoulders to hips in view, or click to choose one.</p>
+          <span class="btn ghost">Choose a photo</span>
+        </label>
+
+        <!-- photo: compare / result -->
+        <div class="compare" id="compare" hidden>
+          <img id="img-before" alt="Your original photo">
+          <div class="after-clip"><img id="img-after" alt="Try-on result"></div>
+          <input type="range" class="compare-range" id="compare-range" min="0" max="100" value="50" aria-label="Drag to compare before and after">
+          <div class="compare-handle" aria-hidden="true"><span></span></div>
+          <span class="label label-left">Original</span>
+          <span class="label label-right" id="after-label">Instant</span>
+        </div>
+
+        <!-- photo: pipeline -->
+        <div class="pipeline" id="pipeline" hidden>
+          <figure><img data-stage="pose" alt=""><figcaption><b>01</b> Pose &amp; torso</figcaption></figure>
+          <figure><img data-stage="warp" alt=""><figcaption><b>02</b> Homography warp</figcaption></figure>
+          <figure><img data-stage="mask" alt=""><figcaption><b>03</b> Body mask</figcaption></figure>
+          <figure><img data-stage="light" alt=""><figcaption><b>04</b> Light &amp; folds</figcaption></figure>
+          <figure><img data-stage="alpha" alt=""><figcaption><b>05</b> Feathered alpha</figcaption></figure>
+          <figure><img data-stage="result" alt=""><figcaption><b>06</b> Composite</figcaption></figure>
+        </div>
+
+        <!-- live -->
+        <div class="live" id="live" hidden>
+          <canvas id="live-canvas" width="640" height="480" aria-label="Live try-on"></canvas>
+          <canvas id="live-overlay" width="640" height="480" aria-hidden="true"></canvas>
+          <div class="welcome live-welcome" id="live-welcome">
+            <span class="eyebrow">Live mirror</span>
+            <h1>Step in front<br><em>of the mirror.</em></h1>
+            <p>Stand about two metres back so your shoulders and hips are in frame.</p>
+            <button class="btn solid" id="btn-start">Start camera</button>
+          </div>
+        </div>
+
+        <!-- view switcher -->
+        <div class="views" id="views" role="tablist" aria-label="View" hidden>
+          <button role="tab" aria-selected="true" data-view="compare">Compare</button>
+          <button role="tab" aria-selected="false" data-view="result">Result</button>
+          <button role="tab" aria-selected="false" data-view="pipeline">Pipeline</button>
+        </div>
+
+        <!-- AI progress -->
+        <div class="tailoring" id="tailoring" hidden>
+          <p class="eyebrow">Studio render</p>
+          <h2 id="tailor-step">Reading your pose</h2>
+          <div class="bar"><span id="tailor-bar"></span></div>
+          <p class="elapsed"><span id="tailor-time">0</span> s · usually about 30 s, the first render also loads the model</p>
+        </div>
+
+        <div class="busy" id="busy" hidden><span class="spinner"></span><span id="busy-text">Working</span></div>
+      </div>
+
+      <div class="cta">
+        <div>
+          <p class="cta-title" id="cta-title">Instant render</p>
+          <p class="note" id="cta-text">Classical pipeline, updates as you adjust. For a photorealistic fitting, render it in the studio.</p>
+        </div>
+        <div class="cta-actions">
+          <button class="btn ghost small" id="btn-save" disabled>Download</button>
+          <button class="btn solid" id="btn-hd" disabled>Studio render <span class="ai">AI</span></button>
+        </div>
+      </div>
+
+      <dl class="metrics" aria-label="Performance">
+        <div><dt>Frame rate</dt><dd id="m-fps">—</dd></div>
+        <div><dt>Pose</dt><dd id="m-pose">—</dd></div>
+        <div><dt>Render</dt><dd id="m-render">—</dd></div>
+        <div><dt>Confidence</dt><dd id="m-conf">—</dd></div>
+      </dl>
+    </section>
+
+    <!-- ================= Fitting room ================= -->
+    <aside class="room" aria-label="Fitting room">
+      <section class="step">
+        <h2><span class="num">01</span> You</h2>
+        <div class="you" id="you-photo" hidden>
+          <img id="you-thumb" alt="">
+          <div>
+            <p id="you-text">Portrait ready</p>
+            <button class="link" id="btn-replace">Replace photo</button>
+          </div>
+        </div>
+        <p class="note" id="you-empty">No photo yet. Add one on the left, or use the live mirror.</p>
+        <div class="live-controls" id="live-controls" hidden>
+          <button class="btn ghost small" id="btn-stop">Stop camera</button>
+          <button class="btn ghost small" id="btn-snapshot">Take snapshot</button>
+        </div>
+      </section>
+
+      <section class="step">
+        <h2><span class="num">02</span> The piece</h2>
+        <ul class="pieces" id="pieces">
+          <li>
+            <label class="piece upload" id="garment-drop">
+              <input type="file" id="garment-file" accept="image/png,image/jpeg,image/webp" hidden>
+              <span class="plus" aria-hidden="true">+</span>
+              <span class="piece-name">Upload</span>
+            </label>
+          </li>
+        </ul>
+      </section>
+
+      <details class="step tune">
+        <summary><h2><span class="num">03</span> Fine-tune <span class="sub">instant render</span></h2></summary>
+        <div class="control"><label for="opt-width">Width <output id="out-width"></output></label>
+          <input type="range" id="opt-width" data-opt="width" min="0.8" max="1.6" step="0.01" value="1.15"></div>
+        <div class="control"><label for="opt-length">Length <output id="out-length"></output></label>
+          <input type="range" id="opt-length" data-opt="length" min="0.8" max="1.4" step="0.01" value="1.0"></div>
+        <div class="control"><label for="opt-lighting">Lighting match <output id="out-lighting"></output></label>
+          <input type="range" id="opt-lighting" data-opt="lighting" min="0" max="1" step="0.05" value="0.3"></div>
+        <div class="control"><label for="opt-shading">Folds &amp; shading <output id="out-shading"></output></label>
+          <input type="range" id="opt-shading" data-opt="shading" min="0" max="1" step="0.05" value="0.45"></div>
+        <div class="control"><label for="opt-feather">Edge softness <output id="out-feather"></output></label>
+          <input type="range" id="opt-feather" data-opt="feather" min="0" max="5" step="0.5" value="2"></div>
+        <label class="toggle"><input type="checkbox" data-opt="sleeves" checked><span class="track"></span>Sleeves follow arms</label>
+        <label class="toggle"><input type="checkbox" data-opt="fit" checked><span class="track"></span>Fit to body outline</label>
+        <label class="toggle"><input type="checkbox" data-opt="tps" checked><span class="track"></span>Edge fit (thin-plate spline)</label>
+        <label class="toggle"><input type="checkbox" data-opt="occlusion" checked><span class="track"></span>Face, hair &amp; hands in front</label>
+        <label class="toggle"><input type="checkbox" id="opt-points"><span class="track"></span>Show body points (live)</label>
+        <button class="link" id="btn-reset">Reset to defaults</button>
+      </details>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="alert" hidden>
+    <p id="toast-text"></p>
+    <button class="link" id="toast-close" aria-label="Dismiss">Dismiss</button>
+  </div>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

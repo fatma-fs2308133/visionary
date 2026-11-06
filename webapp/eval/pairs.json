@@ -1,0 +1,6 @@
+{
+  "_note": "Fixed benchmark: every method is run on exactly these pairs. Persons: VITON-HD test models (from the IDM-VTON examples, research use) + one stock photo. Garments: data/catalog (VITON-HD).",
+  "persons": ["00034_00", "00035_00", "00055_00", "00121_00", "01992_00", "stock_man"],
+  "garments": ["velvet_wrap_top", "colour_block_polo", "gingham_shirt", "red_tie_waist_tee"],
+  "ai_subset": [["00055_00", "colour_block_polo"], ["00035_00", "red_tie_waist_tee"], ["00121_00", "gingham_shirt"], ["stock_man", "velvet_wrap_top"]]
+}

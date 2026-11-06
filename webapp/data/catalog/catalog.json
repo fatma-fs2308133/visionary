@@ -1,0 +1,233 @@
+{
+ "_source": "H&M product photos (hm_*): Kaggle 'H&M Personalized Fashion Recommendations' (2022), non-commercial / academic research. VITON-HD (Choi et al., CVPR 2021) product images: research / non-commercial use; hidden from the picker, used by the benchmark in eval/.",
+ "04469_00.jpg": {
+  "name": "Velvet wrap top",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "09133_00.jpg": {
+  "name": "Ribbed button cami",
+  "sleeves": "none",
+  "hidden": true
+ },
+ "09163_00.jpg": {
+  "name": "Colour-block polo",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "09176_00.jpg": {
+  "name": "Gingham shirt",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "09236_00.jpg": {
+  "name": "Red tie-waist tee",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "09256_00.jpg": {
+  "name": "Leopard shell top",
+  "sleeves": "none",
+  "hidden": true
+ },
+ "09263_00.jpg": {
+  "name": "Chain-print blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "09290_00.jpg": {
+  "name": "Peach mock-neck blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "09305_00.jpg": {
+  "name": "Cobalt lace-trim tee",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "00069_00.jpg": {
+  "name": "Teal floral blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00095_00.jpg": {
+  "name": "Rust polka-dot bow blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00096_00.jpg": {
+  "name": "Olive sleeveless blouse",
+  "sleeves": "none",
+  "hidden": true
+ },
+ "00158_00.jpg": {
+  "name": "Khaki V-neck blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00205_00.jpg": {
+  "name": "Navy floral tie-neck blouse",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "00254_00.jpg": {
+  "name": "Black lace peplum top",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "00286_00.jpg": {
+  "name": "Blue stripe tee",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "00291_00.jpg": {
+  "name": "Lilac ruffle blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00401_00.jpg": {
+  "name": "Rust lace-hem knit",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00428_00.jpg": {
+  "name": "Camel rib knit",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00460_00.jpg": {
+  "name": "Burgundy print peplum blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00474_00.jpg": {
+  "name": "Mint sleeveless blouse",
+  "sleeves": "none",
+  "hidden": true
+ },
+ "00518_00.jpg": {
+  "name": "Yellow cami",
+  "sleeves": "none",
+  "hidden": true
+ },
+ "00664_00.jpg": {
+  "name": "Red cap-sleeve tee",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "00705_00.jpg": {
+  "name": "Mustard floral blouse",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00714_00.jpg": {
+  "name": "Green button tee",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "00470_00.jpg": {
+  "name": "Rose print long-sleeve top",
+  "sleeves": "long",
+  "hidden": true
+ },
+ "00690_00.jpg": {
+  "name": "Purple cap-sleeve tee",
+  "sleeves": "short",
+  "hidden": true
+ },
+ "hm_00028.jpg": {
+  "name": "Purple check flannel shirt",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00107.jpg": {
+  "name": "Striped boat-neck tee",
+  "sleeves": "short",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00134.jpg": {
+  "name": "Green strappy V-neck top",
+  "sleeves": "none",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00236.jpg": {
+  "name": "Pink chunky-knit jumper",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00348.jpg": {
+  "name": "Pink stripe shirt",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00372.jpg": {
+  "name": "Black satin rib cami",
+  "sleeves": "none",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00376.jpg": {
+  "name": "Black satin blouse",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00402.jpg": {
+  "name": "Black floral lace-collar blouse",
+  "sleeves": "short",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00436.jpg": {
+  "name": "Khaki palm print top",
+  "sleeves": "none",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00439.jpg": {
+  "name": "Red lace blouse",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00447.jpg": {
+  "name": "Green print wrap tee",
+  "sleeves": "short",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00617.jpg": {
+  "name": "Red check flannel shirt",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00664.jpg": {
+  "name": "Peach lace flounce blouse",
+  "sleeves": "short",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00684.jpg": {
+  "name": "Grey stand-collar blouse",
+  "sleeves": "short",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00709.jpg": {
+  "name": "Khaki tie-neck sleeveless top",
+  "sleeves": "none",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00730.jpg": {
+  "name": "Navy utility shirt",
+  "sleeves": "short",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00750.jpg": {
+  "name": "Orange flared-sleeve jumper",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00751.jpg": {
+  "name": "Peach lace-trim rib top",
+  "sleeves": "long",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ },
+ "hm_00780.jpg": {
+  "name": "Pink cropped tee",
+  "sleeves": "short",
+  "source": "H&M (Kaggle H&M Personalized Fashion Recommendations, non-commercial research)"
+ }
+}

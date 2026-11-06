@@ -1,0 +1,14 @@
+method,person,garment,seconds,status
+leffa,00055_00,colour_block_polo,6.5,"error: Value: 'False' (type: <class 'str'>) is not in the list of choices: [True, False]"
+leffa,00035_00,red_tie_waist_tee,6.1,"error: Value: 'False' (type: <class 'str'>) is not in the list of choices: [True, False]"
+leffa,00121_00,gingham_shirt,6.4,"error: Value: 'False' (type: <class 'str'>) is not in the list of choices: [True, False]"
+leffa,stock_man,velvet_wrap_top,6.2,"error: Value: 'False' (type: <class 'str'>) is not in the list of choices: [True, False]"
+fashn,00055_00,colour_block_polo,9.5,error: You have exceeded your ZeroGPU runs limit. Authenticate with a Hugging Face token for more quota - https://huggingface.co/settings/tokens
+idm,00055_00,colour_block_polo,29.8,ok
+idm,00035_00,red_tie_waist_tee,19.7,ok
+idm,00121_00,gingham_shirt,6.0,error: 'You have exceeded your ZeroGPU quota (60s requested vs. 84s left). Try again in 23:39:46. Authenticate with a Hugging Face token for more quota - https://huggi
+fitdit,00055_00,colour_block_polo,16.5,"error: The upstream Gradio app has raised an exception but has not enabled verbose error reporting. To enable, set show_error=True in launch()."
+fitdit,00035_00,red_tie_waist_tee,14.7,"error: The upstream Gradio app has raised an exception but has not enabled verbose error reporting. To enable, set show_error=True in launch()."
+fitdit,00121_00,gingham_shirt,15.1,"error: The upstream Gradio app has raised an exception but has not enabled verbose error reporting. To enable, set show_error=True in launch()."
+fitdit,stock_man,velvet_wrap_top,14.1,"error: The upstream Gradio app has raised an exception but has not enabled verbose error reporting. To enable, set show_error=True in launch()."
+leffa,00055_00,colour_block_polo,6.3,error: You have exceeded your ZeroGPU runs limit. Authenticate with a Hugging Face token for more quota - https://huggingface.co/settings/tokens

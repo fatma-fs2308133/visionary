@@ -58,7 +58,7 @@ classdef TryOnApp < handle
         WarpDrop
         PreBox, FitBox, SleeveBox, LightBox, ShadeBox, LandmarkBox, MaskBox
         SigmaSlider, ErodeSlider, LightSlider, ShadeSlider
-        SaveBtn, LiveBtn
+        SaveBtn, LiveBtn, StudioBtn
         FpsLabel, ConfLabel, SourceLabel, StatusLabel, Lamp
     end
 
@@ -313,6 +313,10 @@ classdef TryOnApp < handle
                 'ButtonPushedFcn', @(~, ~) app.onSave()), r, 1);
             app.LiveBtn = place(uibutton(g, 'Text', 'Live video (optional)', ...
                 'ButtonPushedFcn', @(~, ~) app.onLive()), r, 2);
+            [r, h] = newRow(h, 32);
+            app.StudioBtn = place(uibutton(g, 'Text', 'Studio render (photorealistic, local AI)', ...
+                'Tooltip', 'Needs the local studio server: cd webapp; .venv/bin/uvicorn server:app', ...
+                'ButtonPushedFcn', @(~, ~) app.onStudio()), r, [1 2]);
             g.RowHeight = h;
         end
 
@@ -559,6 +563,33 @@ classdef TryOnApp < handle
             end
             figure(app.Fig);
             app.refreshGarments(g.name);
+        end
+
+        function onStudio(app)
+            % Photorealistic render of the current photo + garment by the
+            % local hybrid pipeline (see studioRender).
+            if app.Running
+                uialert(app.Fig, 'Stop the live video first, or take a photo.', 'Live video running');
+                return
+            end
+            if isempty(app.Photo)
+                uialert(app.Fig, 'Upload or take your photo first.', 'No photo');
+                return
+            end
+            dlg = uiprogressdlg(app.Fig, 'Title', 'Studio render', 'Indeterminate', 'on', ...
+                'Message', 'Rendering locally on the Mac''s GPU (about 30 s; the first render also loads the model)...');
+            cleanup = onCleanup(@() close(dlg));
+            try
+                [out, info] = studioRender(app.Photo, app.Session.currentGarment());
+            catch err
+                uialert(app.Fig, err.message, 'Studio render failed');
+                return
+            end
+            app.ImResult.ImageSource = out;
+            app.LastOut = out;
+            app.LastFrame = imresize(im2uint8(app.Photo), [size(out, 1) size(out, 2)]);
+            if isempty(app.LastInfo), app.LastInfo = struct('ok', true); else, app.LastInfo.ok = true; end
+            app.StatusLabel.Text = sprintf('Studio render done in %.0f s (local CatVTON + our geometry).', info.seconds);
         end
 
         function onSave(app)
